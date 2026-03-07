@@ -3,6 +3,8 @@ mod commands;
 mod repl;
 mod ui;
 
+use std::path::PathBuf;
+
 use clap::Parser;
 
 fn main() -> anyhow::Result<()> {
@@ -13,9 +15,15 @@ fn main() -> anyhow::Result<()> {
         original_hook(info);
     }));
 
-    let _cli = cli::Cli::parse();
+    let cli = cli::Cli::parse();
 
-    ui::welcome::render()?;
+    let store_path = match cli.path {
+        Some(p) => PathBuf::from(p),
+        None => std::env::current_dir()?,
+    };
+    let store_path_str = store_path.to_string_lossy();
+
+    ui::welcome::render(&store_path_str)?;
     repl::run()?;
 
     println!("\nGoodbye!");

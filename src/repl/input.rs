@@ -53,8 +53,8 @@ pub fn read_input(commands: &[Command]) -> anyhow::Result<Input> {
     // Print prompt
     crossterm::execute!(
         out,
-        SetForegroundColor(style::HEADING),
-        Print("> "),
+        SetForegroundColor(crossterm::style::Color::Black),
+        Print("❯ "),
         ResetColor,
     )?;
 
@@ -65,7 +65,7 @@ pub fn read_input(commands: &[Command]) -> anyhow::Result<Input> {
         out,
         cursor::MoveUp(2),
         Print("\r"),
-        cursor::MoveRight(2), // position after "> "
+        cursor::MoveRight(2), // position after "❯ "
     )?;
     out.flush()?;
 
@@ -116,7 +116,7 @@ pub fn read_input(commands: &[Command]) -> anyhow::Result<Input> {
                                 crossterm::execute!(
                                     out,
                                     Print("\r"),
-                                    cursor::MoveRight(2), // past "> "
+                                    cursor::MoveRight(2), // past "❯ "
                                     Clear(ClearType::UntilNewLine),
                                 )?;
                             }
