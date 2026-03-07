@@ -19,9 +19,17 @@ pub fn run(buffer: &mut String, commands: &[Command]) -> anyhow::Result<Result> 
     let mut selected: usize = 0;
 
     loop {
-        let filtered: Vec<&Command> = commands
+        let filtered: Vec<(&Command, Option<&str>)> = commands
             .iter()
-            .filter(|c| c.name.starts_with(buffer.as_str()))
+            .filter_map(|c| {
+                if c.name.starts_with(buffer.as_str()) {
+                    Some((c, None))
+                } else if let Some(alias) = c.aliases.iter().find(|a| a.starts_with(buffer.as_str())) {
+                    Some((c, Some(*alias)))
+                } else {
+                    None
+                }
+            })
             .collect();
 
         draw_menu(&mut out, &filtered, selected)?;
@@ -48,7 +56,7 @@ pub fn run(buffer: &mut String, commands: &[Command]) -> anyhow::Result<Result> 
                     return Ok(Result::Dismissed);
                 }
                 (KeyCode::Enter, _) => {
-                    if let Some(cmd) = filtered.get(selected) {
+                    if let Some((cmd, _)) = filtered.get(selected) {
                         // Replace buffer with selected command
                         let old_len = buffer.len() as u16;
                         if old_len > 0 {
@@ -113,18 +121,24 @@ pub fn run(buffer: &mut String, commands: &[Command]) -> anyhow::Result<Result> 
     }
 }
 
-fn draw_menu(out: &mut impl Write, items: &[&Command], selected: usize) -> anyhow::Result<()> {
+fn draw_menu(out: &mut impl Write, items: &[(&Command, Option<&str>)], selected: usize) -> anyhow::Result<()> {
     // Save cursor position
     crossterm::execute!(out, cursor::SavePosition)?;
 
     // Skip past the bottom divider line
     crossterm::execute!(out, Print("\n\r"))?;
 
-    for (i, cmd) in items.iter().enumerate() {
+    for (i, (cmd, matched_alias)) in items.iter().enumerate() {
         crossterm::execute!(out, Print("\n\r"))?;
 
+        // Build display name, e.g. "/exit" or "/exit (quit)"
+        let display_name = match matched_alias {
+            Some(alias) => format!("{} ({})", cmd.name, &alias[1..]),
+            None => cmd.name.to_string(),
+        };
+
         let desc_col = 24usize;
-        let name_pad = desc_col.saturating_sub(cmd.name.len() + 3);
+        let name_pad = desc_col.saturating_sub(display_name.len() + 3);
 
         if i == selected {
             // Selected: colored name and description
@@ -132,7 +146,7 @@ fn draw_menu(out: &mut impl Write, items: &[&Command], selected: usize) -> anyho
                 out,
                 Print("  "),
                 SetForegroundColor(style::HEADING),
-                Print(cmd.name),
+                Print(&display_name),
                 ResetColor,
             )?;
             write!(out, "{}", " ".repeat(name_pad))?;
@@ -148,7 +162,7 @@ fn draw_menu(out: &mut impl Write, items: &[&Command], selected: usize) -> anyho
                 out,
                 Print("  "),
                 SetForegroundColor(style::DIM),
-                Print(cmd.name),
+                Print(&display_name),
             )?;
             write!(out, "{}", " ".repeat(name_pad))?;
             crossterm::execute!(

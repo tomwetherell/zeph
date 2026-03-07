@@ -3,6 +3,7 @@ mod help;
 pub struct Command {
     pub name: &'static str,
     pub description: &'static str,
+    pub aliases: &'static [&'static str],
     pub handler: fn() -> CommandResult,
 }
 
@@ -21,11 +22,13 @@ pub fn all_commands() -> Vec<Command> {
         Command {
             name: "/help",
             description: "Show available commands",
+            aliases: &[],
             handler: help::run,
         },
         Command {
             name: "/exit",
             description: "Exit zeph",
+            aliases: &["/quit"],
             handler: || CommandResult {
                 action: CommandAction::Quit,
                 subtitle: Some("Bye!".into()),
