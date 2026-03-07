@@ -2,7 +2,7 @@ use std::io::{self, Write};
 
 use crossterm::style::{Attribute, Print, ResetColor, SetAttribute, SetForegroundColor};
 
-use super::{all_commands, CommandResult};
+use super::{all_commands, CommandAction, CommandResult};
 use crate::ui::style;
 
 pub fn run() -> CommandResult {
@@ -38,5 +38,8 @@ pub fn run() -> CommandResult {
     }
 
     let _ = writeln!(out);
-    CommandResult::Continue
+    CommandResult {
+        action: CommandAction::Continue,
+        subtitle: None,
+    }
 }

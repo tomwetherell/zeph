@@ -1,16 +1,32 @@
 mod autocomplete;
 mod input;
 
-use crate::commands::{self, CommandResult};
+use std::io::{self, Write};
+
+use crossterm::style::{Print, ResetColor, SetForegroundColor};
+
+use crate::commands::{self, CommandAction};
+use crate::ui::style;
 
 pub fn run() -> anyhow::Result<()> {
     let commands = commands::all_commands();
     loop {
         match input::read_input(&commands)? {
             input::Input::Command(name) => {
-                match commands::execute(&name) {
-                    CommandResult::Quit => break,
-                    CommandResult::Continue => {}
+                let result = commands::execute(&name);
+                if let Some(msg) = &result.subtitle {
+                    let mut out = io::stdout();
+                    let _ = crossterm::execute!(
+                        out,
+                        SetForegroundColor(style::DIM),
+                        Print(format!("  ╰  {msg}\n")),
+                        ResetColor,
+                    );
+                    let _ = out.flush();
+                }
+                match result.action {
+                    CommandAction::Quit => break,
+                    CommandAction::Continue => {}
                 }
             }
             input::Input::Quit => break,

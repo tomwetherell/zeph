@@ -6,9 +6,14 @@ pub struct Command {
     pub handler: fn() -> CommandResult,
 }
 
-pub enum CommandResult {
+pub enum CommandAction {
     Continue,
     Quit,
+}
+
+pub struct CommandResult {
+    pub action: CommandAction,
+    pub subtitle: Option<String>,
 }
 
 pub fn all_commands() -> Vec<Command> {
@@ -21,7 +26,10 @@ pub fn all_commands() -> Vec<Command> {
         Command {
             name: "/quit",
             description: "Exit zeph",
-            handler: || CommandResult::Quit,
+            handler: || CommandResult {
+                action: CommandAction::Quit,
+                subtitle: Some("Bye!".into()),
+            },
         },
     ]
 }
@@ -33,5 +41,8 @@ pub fn execute(name: &str) -> CommandResult {
         }
     }
     eprintln!("Unknown command: {name}");
-    CommandResult::Continue
+    CommandResult {
+        action: CommandAction::Continue,
+        subtitle: None,
+    }
 }

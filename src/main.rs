@@ -26,6 +26,5 @@ fn main() -> anyhow::Result<()> {
     ui::welcome::render(&store_path_str)?;
     repl::run()?;
 
-    println!("\nGoodbye!");
     Ok(())
 }

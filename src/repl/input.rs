@@ -2,7 +2,7 @@ use std::io::{self, Write};
 
 use crossterm::cursor;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
-use crossterm::style::{Print, ResetColor, SetForegroundColor};
+use crossterm::style::{Print, ResetColor, SetBackgroundColor, SetForegroundColor};
 use crossterm::terminal::{self, Clear, ClearType};
 
 use crate::commands::Command;
@@ -44,6 +44,38 @@ pub fn print_divider(out: &mut impl Write) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// After a command is submitted, rewrite the 3-line prompt block
+/// (top divider, input line, bottom divider) to show the command
+/// on a gray background with no dividers.
+/// Cursor must be on the input line when called.
+fn confirm_prompt(out: &mut impl Write, buffer: &str) -> anyhow::Result<()> {
+    let (term_width, _) = terminal::size().unwrap_or((80, 24));
+
+    // Move up to top divider and clear it
+    crossterm::execute!(out, cursor::MoveUp(1), Print("\r"), Clear(ClearType::CurrentLine))?;
+
+    // Move down to input line, clear and rewrite with gray background
+    crossterm::execute!(out, cursor::MoveDown(1), Print("\r"), Clear(ClearType::CurrentLine))?;
+    let cmd_text = format!(" {buffer}");
+    let arrow_pad = 1; // "❯" is 1 char wide
+    let pad = (term_width as usize).saturating_sub(arrow_pad + cmd_text.chars().count());
+    crossterm::execute!(
+        out,
+        SetBackgroundColor(style::INPUT_BG),
+        SetForegroundColor(style::DIM),
+        Print("❯"),
+        SetForegroundColor(crossterm::style::Color::Black),
+        Print(&cmd_text),
+        Print(" ".repeat(pad)),
+        ResetColor,
+    )?;
+
+    // Move down to bottom divider and clear it
+    crossterm::execute!(out, Print("\n\r"), Clear(ClearType::CurrentLine))?;
+
+    Ok(())
+}
+
 pub fn read_input(commands: &[Command]) -> anyhow::Result<Input> {
     let mut out = io::stdout();
 
@@ -80,12 +112,13 @@ pub fn read_input(commands: &[Command]) -> anyhow::Result<Input> {
                     return Ok(Input::Quit);
                 }
                 (KeyCode::Enter, _) => {
-                    crossterm::execute!(out, cursor::MoveDown(1), Print("\r\n"))?;
-                    return if buffer.is_empty() {
-                        Ok(Input::Empty)
+                    if buffer.is_empty() {
+                        crossterm::execute!(out, cursor::MoveDown(1), Print("\r\n"))?;
+                        return Ok(Input::Empty);
                     } else {
-                        Ok(Input::Command(buffer))
-                    };
+                        confirm_prompt(&mut out, &buffer)?;
+                        return Ok(Input::Command(buffer));
+                    }
                 }
                 (KeyCode::Backspace, _) => {
                     if !buffer.is_empty() {
@@ -105,8 +138,7 @@ pub fn read_input(commands: &[Command]) -> anyhow::Result<Input> {
                     // Enter autocomplete mode
                     match autocomplete::run(&mut buffer, commands)? {
                         autocomplete::Result::Selected => {
-                            // Command was filled into buffer, submit it
-                            crossterm::execute!(out, cursor::MoveDown(1), Print("\r\n"))?;
+                            confirm_prompt(&mut out, &buffer)?;
                             return Ok(Input::Command(buffer));
                         }
                         autocomplete::Result::Dismissed => {
@@ -123,7 +155,7 @@ pub fn read_input(commands: &[Command]) -> anyhow::Result<Input> {
                             // Continue reading input
                         }
                         autocomplete::Result::Submitted => {
-                            crossterm::execute!(out, cursor::MoveDown(1), Print("\r\n"))?;
+                            confirm_prompt(&mut out, &buffer)?;
                             return Ok(Input::Command(buffer));
                         }
                     }
