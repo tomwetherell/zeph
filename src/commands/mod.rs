@@ -24,7 +24,7 @@ pub fn all_commands() -> Vec<Command> {
             handler: help::run,
         },
         Command {
-            name: "/quit",
+            name: "/exit",
             description: "Exit zeph",
             handler: || CommandResult {
                 action: CommandAction::Quit,
