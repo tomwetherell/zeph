@@ -31,8 +31,24 @@ impl Drop for RawModeGuard {
     }
 }
 
+pub fn print_divider(out: &mut impl Write) -> anyhow::Result<()> {
+    let (term_width, _) = terminal::size().unwrap_or((80, 24));
+    let line = "─".repeat(term_width as usize);
+    crossterm::execute!(
+        out,
+        SetForegroundColor(style::DIM),
+        Print(&line),
+        Print("\n"),
+        ResetColor,
+    )?;
+    Ok(())
+}
+
 pub fn read_input(commands: &[Command]) -> anyhow::Result<Input> {
     let mut out = io::stdout();
+
+    // Print divider above prompt
+    print_divider(&mut out)?;
 
     // Print prompt
     crossterm::execute!(
@@ -40,6 +56,16 @@ pub fn read_input(commands: &[Command]) -> anyhow::Result<Input> {
         SetForegroundColor(style::HEADING),
         Print("> "),
         ResetColor,
+    )?;
+
+    // Print bottom divider, then move cursor back up to prompt line
+    crossterm::execute!(out, Print("\n"))?;
+    print_divider(&mut out)?;
+    crossterm::execute!(
+        out,
+        cursor::MoveUp(2),
+        Print("\r"),
+        cursor::MoveRight(2), // position after "> "
     )?;
     out.flush()?;
 
@@ -50,11 +76,11 @@ pub fn read_input(commands: &[Command]) -> anyhow::Result<Input> {
         if let Event::Key(key) = event::read()? {
             match (key.code, key.modifiers) {
                 (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
-                    crossterm::execute!(out, Print("\n"))?;
+                    crossterm::execute!(out, cursor::MoveDown(1), Print("\r\n"))?;
                     return Ok(Input::Quit);
                 }
                 (KeyCode::Enter, _) => {
-                    crossterm::execute!(out, Print("\n"))?;
+                    crossterm::execute!(out, cursor::MoveDown(1), Print("\r\n"))?;
                     return if buffer.is_empty() {
                         Ok(Input::Empty)
                     } else {
@@ -80,24 +106,24 @@ pub fn read_input(commands: &[Command]) -> anyhow::Result<Input> {
                     match autocomplete::run(&mut buffer, commands)? {
                         autocomplete::Result::Selected => {
                             // Command was filled into buffer, submit it
-                            crossterm::execute!(out, Print("\n"))?;
+                            crossterm::execute!(out, cursor::MoveDown(1), Print("\r\n"))?;
                             return Ok(Input::Command(buffer));
                         }
                         autocomplete::Result::Dismissed => {
-                            // User pressed Esc, buffer may have been cleared
                             if buffer.is_empty() {
-                                // Erase the prompt line and reprint
+                                // User deleted everything — erase the prompt text
+                                // and stay in the input loop
                                 crossterm::execute!(
                                     out,
                                     Print("\r"),
-                                    Clear(ClearType::CurrentLine),
+                                    cursor::MoveRight(2), // past "> "
+                                    Clear(ClearType::UntilNewLine),
                                 )?;
-                                drop(_guard);
-                                return Ok(Input::Empty);
                             }
+                            // Continue reading input
                         }
                         autocomplete::Result::Submitted => {
-                            crossterm::execute!(out, Print("\n"))?;
+                            crossterm::execute!(out, cursor::MoveDown(1), Print("\r\n"))?;
                             return Ok(Input::Command(buffer));
                         }
                     }

@@ -2,10 +2,8 @@ use std::io::{self, Write};
 
 use crossterm::cursor;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
-use crossterm::style::{
-    Attribute, Color, Print, ResetColor, SetAttribute, SetBackgroundColor, SetForegroundColor,
-};
-use crossterm::terminal::{self, Clear, ClearType};
+use crossterm::style::{Print, ResetColor, SetForegroundColor};
+use crossterm::terminal::{Clear, ClearType};
 
 use crate::commands::Command;
 use crate::ui::style;
@@ -116,63 +114,48 @@ pub fn run(buffer: &mut String, commands: &[Command]) -> anyhow::Result<Result> 
 }
 
 fn draw_menu(out: &mut impl Write, items: &[&Command], selected: usize) -> anyhow::Result<()> {
-    let (term_width, _) = terminal::size().unwrap_or((80, 24));
-
     // Save cursor position
     crossterm::execute!(out, cursor::SavePosition)?;
+
+    // Skip past the bottom divider line
+    crossterm::execute!(out, Print("\n\r"))?;
 
     for (i, cmd) in items.iter().enumerate() {
         crossterm::execute!(out, Print("\n\r"))?;
 
-        if i == selected {
-            crossterm::execute!(
-                out,
-                SetBackgroundColor(Color::Rgb {
-                    r: 60,
-                    g: 60,
-                    b: 60
-                }),
-            )?;
-        }
-
         let desc_col = 24usize;
         let name_pad = desc_col.saturating_sub(cmd.name.len() + 3);
 
-        crossterm::execute!(
-            out,
-            Print("  "),
-            SetForegroundColor(style::HEADING),
-            SetAttribute(Attribute::Bold),
-            Print(cmd.name),
-            SetAttribute(Attribute::Reset),
-        )?;
-
         if i == selected {
+            // Selected: colored name and description
             crossterm::execute!(
                 out,
-                SetBackgroundColor(Color::Rgb {
-                    r: 60,
-                    g: 60,
-                    b: 60
-                }),
+                Print("  "),
+                SetForegroundColor(style::HEADING),
+                Print(cmd.name),
+                ResetColor,
             )?;
-        }
-
-        write!(out, "{}", " ".repeat(name_pad))?;
-
-        crossterm::execute!(
-            out,
-            SetForegroundColor(style::DIM),
-            Print(cmd.description),
-            ResetColor,
-        )?;
-
-        // Fill rest of line if selected (for background highlight)
-        if i == selected {
-            let used = 2 + cmd.name.len() + name_pad + cmd.description.len();
-            let remaining = (term_width as usize).saturating_sub(used);
-            write!(out, "{}", " ".repeat(remaining))?;
-            crossterm::execute!(out, ResetColor)?;
+            write!(out, "{}", " ".repeat(name_pad))?;
+            crossterm::execute!(
+                out,
+                SetForegroundColor(style::HEADING),
+                Print(cmd.description),
+                ResetColor,
+            )?;
+        } else {
+            // Unselected: dark gray
+            crossterm::execute!(
+                out,
+                Print("  "),
+                SetForegroundColor(style::DIM),
+                Print(cmd.name),
+            )?;
+            write!(out, "{}", " ".repeat(name_pad))?;
+            crossterm::execute!(
+                out,
+                Print(cmd.description),
+                ResetColor,
+            )?;
         }
     }
 
@@ -185,6 +168,9 @@ fn draw_menu(out: &mut impl Write, items: &[&Command], selected: usize) -> anyho
 
 fn erase_menu(out: &mut impl Write, item_count: usize) -> anyhow::Result<()> {
     crossterm::execute!(out, cursor::SavePosition)?;
+
+    // Skip past the bottom divider line
+    crossterm::execute!(out, Print("\n\r"))?;
 
     for _ in 0..item_count {
         crossterm::execute!(
