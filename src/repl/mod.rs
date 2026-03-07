@@ -19,7 +19,7 @@ pub fn run() -> anyhow::Result<()> {
                     let _ = crossterm::execute!(
                         out,
                         SetForegroundColor(style::DIM),
-                        Print(format!("  ╰  {msg}\n")),
+                        Print(format!("  ⎿  {msg}\n")),
                         ResetColor,
                     );
                     let _ = out.flush();
