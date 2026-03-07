@@ -1,22 +1,13 @@
 use std::io::{self, Write};
 
-use crossterm::style::{Attribute, Print, ResetColor, SetAttribute, SetForegroundColor};
+use crossterm::style::{Print, ResetColor, SetForegroundColor};
 
 use super::{all_commands, CommandAction, CommandResult};
 use crate::ui::style;
 
 pub fn run() -> CommandResult {
     let mut out = io::stdout();
-    let _ = crossterm::execute!(
-        out,
-        Print("\n"),
-        SetForegroundColor(style::HEADING),
-        SetAttribute(Attribute::Bold),
-        Print("Available commands:\n"),
-        SetAttribute(Attribute::Reset),
-        ResetColor,
-        Print("\n"),
-    );
+    let _ = crossterm::execute!(out, Print("\n"));
 
     for cmd in all_commands() {
         let _ = crossterm::execute!(
