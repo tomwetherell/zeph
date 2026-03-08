@@ -77,8 +77,13 @@ fn parse_s3(input: &str) -> anyhow::Result<StoreLocation> {
         || std::env::var("AWS_PROFILE").is_ok()
         || std::env::var("AWS_WEB_IDENTITY_TOKEN_FILE").is_ok();
 
+    let region = std::env::var("AWS_DEFAULT_REGION")
+        .or_else(|_| std::env::var("AWS_REGION"))
+        .unwrap_or_else(|_| detect_s3_region(bucket).unwrap_or_else(|| "us-east-1".to_string()));
+
     let mut builder = object_store::aws::AmazonS3Builder::from_env()
-        .with_bucket_name(bucket);
+        .with_bucket_name(bucket)
+        .with_region(region);
     if !has_creds {
         builder = builder.with_skip_signature(true);
     }
@@ -90,6 +95,41 @@ fn parse_s3(input: &str) -> anyhow::Result<StoreLocation> {
         store: Arc::new(store),
         base_path: ObjectPath::from(path),
     })
+}
+
+/// Detect the region of an S3 bucket via a HEAD request to the global endpoint.
+fn detect_s3_region(bucket: &str) -> Option<String> {
+    use std::io::{BufRead, BufReader, Write};
+    use std::net::TcpStream;
+
+    let host = format!("{bucket}.s3.amazonaws.com");
+    let mut stream = TcpStream::connect((&*host, 443_u16)).ok()?;
+
+    // We need TLS — use rustls via the already-present rustls-tls stack.
+    // Fall back to a simpler approach: parse the redirect from a plain HTTP request
+    // to the non-TLS endpoint. S3 actually responds to HTTP on port 80.
+    drop(stream);
+
+    stream = TcpStream::connect((&*host, 80_u16)).ok()?;
+    stream.set_read_timeout(Some(std::time::Duration::from_secs(5))).ok()?;
+    stream.set_write_timeout(Some(std::time::Duration::from_secs(5))).ok()?;
+
+    let request = format!(
+        "HEAD / HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n\r\n"
+    );
+    stream.write_all(request.as_bytes()).ok()?;
+
+    let reader = BufReader::new(stream);
+    for line in reader.lines().take(20) {
+        let line = line.ok()?;
+        if line.is_empty() {
+            break;
+        }
+        if let Some(value) = line.strip_prefix("x-amz-bucket-region: ") {
+            return Some(value.trim().to_string());
+        }
+    }
+    None
 }
 
 fn parse_azure(input: &str) -> anyhow::Result<StoreLocation> {

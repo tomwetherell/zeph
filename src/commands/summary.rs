@@ -26,7 +26,7 @@ pub fn run(ctx: &Ctx) -> CommandResult {
                 out,
                 Print("\n"),
                 SetForegroundColor(style::DIM),
-                Print(format!("  Error: {e}\n\n")),
+                Print(format!("  Error: {e:?}\n\n")),
                 ResetColor,
             );
         }

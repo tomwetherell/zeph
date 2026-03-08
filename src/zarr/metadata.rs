@@ -37,7 +37,7 @@ pub fn parse_store(
             let meta_path = base_path.child(".zmetadata");
             let result = runtime
                 .block_on(store.get(&meta_path))
-                .context("Could not read .zmetadata from remote store")?;
+                .with_context(|| format!("Could not read .zmetadata from remote store (path: {meta_path})"))?;
             let bytes = runtime
                 .block_on(result.bytes())
                 .context("Could not read bytes from remote .zmetadata")?;
