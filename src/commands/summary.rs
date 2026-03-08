@@ -7,17 +7,18 @@ use crossterm::style::{Print, ResetColor, SetForegroundColor};
 use super::{CommandResult, CommandAction, Ctx};
 use crate::ui::style;
 use crate::zarr::metadata::{self, ArrayMeta, StoreMeta};
+use crate::zarr::store::StoreLocation;
 
 pub fn run(ctx: &Ctx) -> CommandResult {
     let mut out = io::stdout();
 
-    match metadata::parse_store(&ctx.store_path) {
+    match metadata::parse_store(&ctx.store, &ctx.runtime) {
         Ok(store) => {
             let has_dims = store.arrays.iter().any(|a| !a.dims.is_empty());
             if has_dims {
-                render_xarray_style(&mut out, &ctx.store_path, &store);
+                render_xarray_style(&mut out, &ctx.store, &store);
             } else {
-                render_flat(&mut out, &ctx.store_path, &store);
+                render_flat(&mut out, &ctx.store, &store);
             }
         }
         Err(e) => {
@@ -37,7 +38,7 @@ pub fn run(ctx: &Ctx) -> CommandResult {
     }
 }
 
-fn render_xarray_style(out: &mut impl Write, store_path: &Path, store: &StoreMeta) {
+fn render_xarray_style(out: &mut impl Write, location: &StoreLocation, store: &StoreMeta) {
     // Build dimension sizes from all arrays
     let mut dim_sizes: BTreeMap<String, usize> = BTreeMap::new();
     for arr in &store.arrays {
@@ -92,8 +93,8 @@ fn render_xarray_style(out: &mut impl Write, store_path: &Path, store: &StoreMet
         .unwrap_or(0);
 
     // Store header
-    let display_path = abbreviate_path(store_path);
-    let size_str = dir_size_human(store_path);
+    let display_path = location.display_path();
+    let size_str = store_size_str(location);
     let _ = crossterm::execute!(out, Print("\n"));
     let _ = crossterm::execute!(
         out,
@@ -174,9 +175,9 @@ fn render_xarray_style(out: &mut impl Write, store_path: &Path, store: &StoreMet
     let _ = writeln!(out);
 }
 
-fn render_flat(out: &mut impl Write, store_path: &Path, store: &StoreMeta) {
-    let display_path = abbreviate_path(store_path);
-    let size_str = dir_size_human(store_path);
+fn render_flat(out: &mut impl Write, location: &StoreLocation, store: &StoreMeta) {
+    let display_path = location.display_path();
+    let size_str = store_size_str(location);
     let _ = crossterm::execute!(out, Print("\n"));
     let _ = crossterm::execute!(
         out,
@@ -269,19 +270,11 @@ fn is_coordinate(arr: &ArrayMeta) -> bool {
     arr.dims.len() == 1 && arr.dims[0] == arr.name
 }
 
-fn abbreviate_path(path: &Path) -> String {
-    if let Some(home) = dirs_free(path) {
-        return home;
+fn store_size_str(location: &StoreLocation) -> String {
+    match location {
+        StoreLocation::Local(path) => dir_size_human(path),
+        StoreLocation::Cloud { .. } => "remote".to_string(),
     }
-    path.display().to_string()
-}
-
-fn dirs_free(path: &Path) -> Option<String> {
-    let home = std::env::var("HOME").ok()?;
-    let home_path = Path::new(&home);
-    path.strip_prefix(home_path)
-        .ok()
-        .map(|rel| format!("~/{}", rel.display()))
 }
 
 fn dir_size_human(path: &Path) -> String {

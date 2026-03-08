@@ -1,8 +1,10 @@
 use std::collections::BTreeMap;
-use std::path::Path;
 
 use anyhow::{bail, Context};
+use object_store::ObjectStoreExt;
 use serde_json::Value;
+
+use super::store::StoreLocation;
 
 #[allow(dead_code)]
 pub struct ArrayMeta {
@@ -19,10 +21,30 @@ pub struct StoreMeta {
     pub arrays: Vec<ArrayMeta>,
 }
 
-pub fn parse_store(store_path: &Path) -> anyhow::Result<StoreMeta> {
-    let zmetadata_path = store_path.join(".zmetadata");
-    let raw = std::fs::read_to_string(&zmetadata_path)
-        .with_context(|| format!("Could not read {}", zmetadata_path.display()))?;
+pub fn parse_store(
+    location: &StoreLocation,
+    runtime: &tokio::runtime::Runtime,
+) -> anyhow::Result<StoreMeta> {
+    let raw = match location {
+        StoreLocation::Local(store_path) => {
+            let zmetadata_path = store_path.join(".zmetadata");
+            std::fs::read_to_string(&zmetadata_path)
+                .with_context(|| format!("Could not read {}", zmetadata_path.display()))?
+        }
+        StoreLocation::Cloud {
+            store, base_path, ..
+        } => {
+            let meta_path = base_path.child(".zmetadata");
+            let result = runtime
+                .block_on(store.get(&meta_path))
+                .context("Could not read .zmetadata from remote store")?;
+            let bytes = runtime
+                .block_on(result.bytes())
+                .context("Could not read bytes from remote .zmetadata")?;
+            String::from_utf8(bytes.to_vec())
+                .context("Remote .zmetadata is not valid UTF-8")?
+        }
+    };
     let top: Value = serde_json::from_str(&raw).context("Invalid JSON in .zmetadata")?;
     let metadata = top
         .get("metadata")

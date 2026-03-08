@@ -4,10 +4,9 @@ mod repl;
 mod ui;
 mod zarr;
 
-use std::path::PathBuf;
-
 use clap::Parser;
 use commands::Ctx;
+use zarr::store::StoreLocation;
 
 fn main() -> anyhow::Result<()> {
     // Ensure terminal is restored on panic
@@ -19,15 +18,19 @@ fn main() -> anyhow::Result<()> {
 
     let cli = cli::Cli::parse();
 
-    let store_path = match cli.path {
-        Some(p) => PathBuf::from(p),
-        None => std::env::current_dir()?,
+    let input = match cli.path {
+        Some(p) => p,
+        None => std::env::current_dir()?
+            .to_string_lossy()
+            .into_owned(),
     };
-    let store_path_str = store_path.to_string_lossy();
 
-    ui::welcome::render(&store_path_str)?;
+    let store = StoreLocation::parse(&input)?;
+    let runtime = tokio::runtime::Runtime::new()?;
 
-    let ctx = Ctx { store_path };
+    ui::welcome::render(&store.display_path())?;
+
+    let ctx = Ctx { store, runtime };
     repl::run(&ctx)?;
 
     Ok(())

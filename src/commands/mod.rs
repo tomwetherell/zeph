@@ -1,10 +1,11 @@
 mod help;
 mod summary;
 
-use std::path::PathBuf;
+use crate::zarr::store::StoreLocation;
 
 pub struct Ctx {
-    pub store_path: PathBuf,
+    pub store: StoreLocation,
+    pub runtime: tokio::runtime::Runtime,
 }
 
 pub struct Command {
