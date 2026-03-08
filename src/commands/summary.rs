@@ -85,6 +85,11 @@ fn render_xarray_style(out: &mut impl Write, store_path: &Path, store: &StoreMet
         .map(|a| format_dims_parens(a).len())
         .max()
         .unwrap_or(0);
+    let max_dtype = all_arrays
+        .iter()
+        .map(|a| friendly_dtype(&a.dtype).len())
+        .max()
+        .unwrap_or(0);
 
     // Store header
     let display_path = abbreviate_path(store_path);
@@ -123,7 +128,7 @@ fn render_xarray_style(out: &mut impl Write, store_path: &Path, store: &StoreMet
         ResetColor,
     );
     for arr in &coords {
-        print_array_line(out, arr, max_name, max_dims_str);
+        print_array_line(out, arr, max_name, max_dims_str, max_dtype);
     }
 
     // Data variables
@@ -134,7 +139,7 @@ fn render_xarray_style(out: &mut impl Write, store_path: &Path, store: &StoreMet
         ResetColor,
     );
     for arr in &data_vars {
-        print_array_line(out, arr, max_name, max_dims_str);
+        print_array_line(out, arr, max_name, max_dims_str, max_dtype);
     }
 
     // Attributes
@@ -206,20 +211,22 @@ fn render_flat(out: &mut impl Write, store_path: &Path, store: &StoreMeta) {
     let _ = writeln!(out);
 }
 
-fn print_array_line(out: &mut impl Write, arr: &ArrayMeta, max_name: usize, max_dims: usize) {
+fn print_array_line(out: &mut impl Write, arr: &ArrayMeta, max_name: usize, max_dims: usize, max_dtype: usize) {
     let dims_str = format_dims_parens(arr);
     let dtype = friendly_dtype(&arr.dtype);
     let shape_str = format_shape(&arr.shape);
     let name_pad = max_name.saturating_sub(arr.name.len()) + 2;
     let dims_pad = max_dims.saturating_sub(dims_str.len()) + 2;
+    let dtype_pad = max_dtype.saturating_sub(dtype.len()) + 2;
     let _ = crossterm::execute!(
         out,
         Print(format!("      {}{}", arr.name, " ".repeat(name_pad))),
         SetForegroundColor(style::DIM),
         Print(format!(
-            "{}{}{dtype}  {shape_str}\n",
+            "{}{}{dtype}{}{shape_str}\n",
             dims_str,
-            " ".repeat(dims_pad)
+            " ".repeat(dims_pad),
+            " ".repeat(dtype_pad)
         )),
         ResetColor,
     );
