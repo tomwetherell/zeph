@@ -1,10 +1,17 @@
 mod help;
+mod summary;
+
+use std::path::PathBuf;
+
+pub struct Ctx {
+    pub store_path: PathBuf,
+}
 
 pub struct Command {
     pub name: &'static str,
     pub description: &'static str,
     pub aliases: &'static [&'static str],
-    pub handler: fn() -> CommandResult,
+    pub handler: fn(&Ctx) -> CommandResult,
 }
 
 pub enum CommandAction {
@@ -20,6 +27,12 @@ pub struct CommandResult {
 pub fn all_commands() -> Vec<Command> {
     vec![
         Command {
+            name: "/summary",
+            description: "Show store overview",
+            aliases: &[],
+            handler: summary::run,
+        },
+        Command {
             name: "/help",
             description: "Show available commands",
             aliases: &[],
@@ -29,7 +42,7 @@ pub fn all_commands() -> Vec<Command> {
             name: "/exit",
             description: "Exit zeph",
             aliases: &["/quit"],
-            handler: || CommandResult {
+            handler: |_| CommandResult {
                 action: CommandAction::Quit,
                 subtitle: Some("Bye!".into()),
             },
@@ -37,10 +50,10 @@ pub fn all_commands() -> Vec<Command> {
     ]
 }
 
-pub fn execute(name: &str) -> CommandResult {
+pub fn execute(name: &str, ctx: &Ctx) -> CommandResult {
     for cmd in all_commands() {
         if cmd.name == name {
-            return (cmd.handler)();
+            return (cmd.handler)(ctx);
         }
     }
     eprintln!("Unknown command: {name}");

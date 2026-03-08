@@ -3,7 +3,7 @@ use std::io::{self, Write};
 use crossterm::cursor;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use crossterm::style::{Print, ResetColor, SetForegroundColor};
-use crossterm::terminal::{Clear, ClearType};
+use crossterm::terminal::{self, Clear, ClearType, ScrollUp};
 
 use crate::commands::Command;
 use crate::ui::style;
@@ -122,8 +122,21 @@ pub fn run(buffer: &mut String, commands: &[Command]) -> anyhow::Result<Result> 
 }
 
 fn draw_menu(out: &mut impl Write, items: &[(&Command, Option<&str>)], selected: usize) -> anyhow::Result<()> {
-    // Save cursor position
-    crossterm::execute!(out, cursor::SavePosition)?;
+    let (col, row) = cursor::position()?;
+
+    // Ensure enough room below for the menu (1 divider + N items)
+    let lines_needed = (items.len() + 1) as u16;
+    let (_, term_h) = terminal::size().unwrap_or((80, 24));
+    let avail = term_h.saturating_sub(row + 1);
+    if avail < lines_needed {
+        let scroll = lines_needed - avail;
+        // ScrollUp shifts viewport content up without corrupting visible lines
+        crossterm::execute!(out, ScrollUp(scroll))?;
+        let new_row = row.saturating_sub(scroll);
+        crossterm::execute!(out, cursor::MoveTo(col, new_row))?;
+    }
+
+    let (_, origin_row) = cursor::position()?;
 
     // Skip past the bottom divider line
     crossterm::execute!(out, Print("\n\r"))?;
@@ -173,15 +186,14 @@ fn draw_menu(out: &mut impl Write, items: &[(&Command, Option<&str>)], selected:
         }
     }
 
-    // Restore cursor position
-    crossterm::execute!(out, cursor::RestorePosition)?;
+    crossterm::execute!(out, cursor::MoveTo(col, origin_row))?;
     out.flush()?;
 
     Ok(())
 }
 
 fn erase_menu(out: &mut impl Write, item_count: usize) -> anyhow::Result<()> {
-    crossterm::execute!(out, cursor::SavePosition)?;
+    let (col, row) = cursor::position()?;
 
     // Skip past the bottom divider line
     crossterm::execute!(out, Print("\n\r"))?;
@@ -194,7 +206,7 @@ fn erase_menu(out: &mut impl Write, item_count: usize) -> anyhow::Result<()> {
         )?;
     }
 
-    crossterm::execute!(out, cursor::RestorePosition)?;
+    crossterm::execute!(out, cursor::MoveTo(col, row))?;
     out.flush()?;
 
     Ok(())

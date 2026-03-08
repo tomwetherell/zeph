@@ -2,10 +2,12 @@ mod cli;
 mod commands;
 mod repl;
 mod ui;
+mod zarr;
 
 use std::path::PathBuf;
 
 use clap::Parser;
+use commands::Ctx;
 
 fn main() -> anyhow::Result<()> {
     // Ensure terminal is restored on panic
@@ -24,7 +26,9 @@ fn main() -> anyhow::Result<()> {
     let store_path_str = store_path.to_string_lossy();
 
     ui::welcome::render(&store_path_str)?;
-    repl::run()?;
+
+    let ctx = Ctx { store_path };
+    repl::run(&ctx)?;
 
     Ok(())
 }
