@@ -13,3 +13,6 @@ serde_json = "1"
 object_store = { version = "0.13", features = ["aws", "gcp", "azure", "http"] }
 tokio = { version = "1", features = ["rt-multi-thread"] }
 url = "2"
+
+[dev-dependencies]
+tempfile = "3"

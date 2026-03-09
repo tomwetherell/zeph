@@ -307,3 +307,198 @@ fn dir_size_bytes(path: &Path) -> u64 {
     }
     total
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::zarr::metadata::ArrayMeta;
+    use std::collections::BTreeMap;
+
+    fn make_array(name: &str, dims: &[&str], shape: &[usize], dtype: &str) -> ArrayMeta {
+        ArrayMeta {
+            name: name.to_string(),
+            dims: dims.iter().map(|s| s.to_string()).collect(),
+            shape: shape.to_vec(),
+            dtype: dtype.to_string(),
+            attrs: BTreeMap::new(),
+        }
+    }
+
+    // --- friendly_dtype ---
+
+    #[test]
+    fn friendly_dtype_float32() {
+        assert_eq!(friendly_dtype("<f4"), "float32");
+        assert_eq!(friendly_dtype(">f4"), "float32");
+    }
+
+    #[test]
+    fn friendly_dtype_float64() {
+        assert_eq!(friendly_dtype("<f8"), "float64");
+        assert_eq!(friendly_dtype(">f8"), "float64");
+    }
+
+    #[test]
+    fn friendly_dtype_int_types() {
+        assert_eq!(friendly_dtype("<i2"), "int16");
+        assert_eq!(friendly_dtype(">i2"), "int16");
+        assert_eq!(friendly_dtype("<i4"), "int32");
+        assert_eq!(friendly_dtype(">i4"), "int32");
+        assert_eq!(friendly_dtype("<i8"), "int64");
+        assert_eq!(friendly_dtype(">i8"), "int64");
+    }
+
+    #[test]
+    fn friendly_dtype_uint_types() {
+        assert_eq!(friendly_dtype("<u1"), "uint8");
+        assert_eq!(friendly_dtype(">u1"), "uint8");
+        assert_eq!(friendly_dtype("<u2"), "uint16");
+        assert_eq!(friendly_dtype(">u2"), "uint16");
+        assert_eq!(friendly_dtype("<u4"), "uint32");
+        assert_eq!(friendly_dtype(">u4"), "uint32");
+        assert_eq!(friendly_dtype("<u8"), "uint64");
+        assert_eq!(friendly_dtype(">u8"), "uint64");
+    }
+
+    #[test]
+    fn friendly_dtype_bool_and_bytes() {
+        assert_eq!(friendly_dtype("|b1"), "bool");
+        assert_eq!(friendly_dtype("|S1"), "bytes");
+    }
+
+    #[test]
+    fn friendly_dtype_unknown_passthrough() {
+        assert_eq!(friendly_dtype("<c16"), "<c16");
+        assert_eq!(friendly_dtype("object"), "object");
+    }
+
+    // --- is_coordinate ---
+
+    #[test]
+    fn is_coordinate_true() {
+        let arr = make_array("time", &["time"], &[365], "<f8");
+        assert!(is_coordinate(&arr));
+    }
+
+    #[test]
+    fn is_coordinate_false_no_dims() {
+        let arr = make_array("time", &[], &[365], "<f8");
+        assert!(!is_coordinate(&arr));
+    }
+
+    #[test]
+    fn is_coordinate_false_dim_name_mismatch() {
+        let arr = make_array("temperature", &["time"], &[365], "<f4");
+        assert!(!is_coordinate(&arr));
+    }
+
+    #[test]
+    fn is_coordinate_false_multiple_dims() {
+        let arr = make_array("time", &["time", "lat"], &[365, 180], "<f8");
+        assert!(!is_coordinate(&arr));
+    }
+
+    // --- format_dims_parens ---
+
+    #[test]
+    fn format_dims_parens_empty() {
+        let arr = make_array("data", &[], &[], "<f4");
+        assert_eq!(format_dims_parens(&arr), "");
+    }
+
+    #[test]
+    fn format_dims_parens_single() {
+        let arr = make_array("time", &["time"], &[365], "<f8");
+        assert_eq!(format_dims_parens(&arr), "(time)");
+    }
+
+    #[test]
+    fn format_dims_parens_multiple() {
+        let arr = make_array("temp", &["time", "lat", "lon"], &[365, 180, 360], "<f4");
+        assert_eq!(format_dims_parens(&arr), "(time, lat, lon)");
+    }
+
+    // --- format_shape ---
+
+    #[test]
+    fn format_shape_empty() {
+        assert_eq!(format_shape(&[]), "");
+    }
+
+    #[test]
+    fn format_shape_single() {
+        assert_eq!(format_shape(&[365]), "365");
+    }
+
+    #[test]
+    fn format_shape_multiple() {
+        assert_eq!(format_shape(&[365, 180, 360]), "365 x 180 x 360");
+    }
+
+    // --- dir_size_bytes ---
+
+    #[test]
+    fn dir_size_bytes_empty_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(dir_size_bytes(dir.path()), 0);
+    }
+
+    #[test]
+    fn dir_size_bytes_with_files() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("a.txt"), "hello").unwrap(); // 5 bytes
+        std::fs::write(dir.path().join("b.txt"), "world!").unwrap(); // 6 bytes
+        assert_eq!(dir_size_bytes(dir.path()), 11);
+    }
+
+    #[test]
+    fn dir_size_bytes_nested() {
+        let dir = tempfile::tempdir().unwrap();
+        let sub = dir.path().join("sub");
+        std::fs::create_dir(&sub).unwrap();
+        std::fs::write(dir.path().join("top.txt"), "aaa").unwrap(); // 3 bytes
+        std::fs::write(sub.join("nested.txt"), "bb").unwrap(); // 2 bytes
+        assert_eq!(dir_size_bytes(dir.path()), 5);
+    }
+
+    #[test]
+    fn dir_size_bytes_nonexistent() {
+        assert_eq!(dir_size_bytes(Path::new("/nonexistent/path")), 0);
+    }
+
+    // --- dir_size_human ---
+
+    #[test]
+    fn dir_size_human_bytes() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("a.txt"), "hello").unwrap();
+        assert_eq!(dir_size_human(dir.path()), "5 B");
+    }
+
+    #[test]
+    fn dir_size_human_kilobytes() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("a.bin"), vec![0u8; 2048]).unwrap();
+        assert_eq!(dir_size_human(dir.path()), "2.0 KB");
+    }
+
+    #[test]
+    fn dir_size_human_megabytes() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("a.bin"), vec![0u8; 3 * 1024 * 1024]).unwrap();
+        assert_eq!(dir_size_human(dir.path()), "3.0 MB");
+    }
+
+    // --- store_size_str ---
+
+    #[test]
+    fn store_size_str_cloud_is_remote() {
+        use std::sync::Arc;
+        let store = StoreLocation::Cloud {
+            url: "gs://bucket/path".to_string(),
+            store: Arc::new(object_store::memory::InMemory::new()),
+            base_path: object_store::path::Path::from("path"),
+        };
+        assert_eq!(store_size_str(&store), "remote");
+    }
+}

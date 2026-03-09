@@ -6,6 +6,7 @@ use serde_json::Value;
 
 use super::store::StoreLocation;
 
+#[derive(Debug)]
 #[allow(dead_code)]
 pub struct ArrayMeta {
     pub name: String,
@@ -15,6 +16,7 @@ pub struct ArrayMeta {
     pub attrs: BTreeMap<String, Value>,
 }
 
+#[derive(Debug)]
 pub struct StoreMeta {
     pub zarr_format: u32,
     pub root_attrs: BTreeMap<String, Value>,
@@ -135,4 +137,223 @@ pub fn parse_store(
         root_attrs,
         arrays,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Write a .zmetadata JSON file into a temp dir and parse it.
+    fn parse_json(json: &str) -> anyhow::Result<StoreMeta> {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join(".zmetadata"), json).unwrap();
+        let location = StoreLocation::Local(dir.path().to_path_buf());
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        parse_store(&location, &runtime)
+    }
+
+    fn minimal_zmetadata(arrays_json: &str) -> String {
+        format!(
+            r#"{{
+                "zarr_format": 2,
+                "metadata": {{
+                    ".zgroup": {{ "zarr_format": 2 }},
+                    ".zattrs": {{}},
+                    {}
+                }}
+            }}"#,
+            arrays_json
+        )
+    }
+
+    // --- zarr_format ---
+
+    #[test]
+    fn parse_zarr_format() {
+        let json = minimal_zmetadata(
+            r#""temperature/.zarray": { "shape": [365], "dtype": "<f4" }"#,
+        );
+        let meta = parse_json(&json).unwrap();
+        assert_eq!(meta.zarr_format, 2);
+    }
+
+    #[test]
+    fn parse_zarr_format_v3() {
+        let json = r#"{
+            "zarr_format": 3,
+            "metadata": {
+                ".zgroup": { "zarr_format": 3 },
+                ".zattrs": {},
+                "data/.zarray": { "shape": [10], "dtype": "<f4" }
+            }
+        }"#;
+        let meta = parse_json(json).unwrap();
+        assert_eq!(meta.zarr_format, 3);
+    }
+
+    #[test]
+    fn parse_zarr_format_defaults_to_2() {
+        let json = r#"{
+            "zarr_format": 2,
+            "metadata": {
+                ".zattrs": {},
+                "data/.zarray": { "shape": [10], "dtype": "<f4" }
+            }
+        }"#;
+        let meta = parse_json(json).unwrap();
+        assert_eq!(meta.zarr_format, 2);
+    }
+
+    // --- root_attrs ---
+
+    #[test]
+    fn parse_root_attrs_empty() {
+        let json = minimal_zmetadata(
+            r#""x/.zarray": { "shape": [5], "dtype": "<f4" }"#,
+        );
+        let meta = parse_json(&json).unwrap();
+        assert!(meta.root_attrs.is_empty());
+    }
+
+    #[test]
+    fn parse_root_attrs_populated() {
+        let json = r#"{
+            "zarr_format": 2,
+            "metadata": {
+                ".zgroup": { "zarr_format": 2 },
+                ".zattrs": { "title": "Test Dataset", "version": 1 },
+                "x/.zarray": { "shape": [5], "dtype": "<f4" }
+            }
+        }"#;
+        let meta = parse_json(json).unwrap();
+        assert_eq!(meta.root_attrs.len(), 2);
+        assert_eq!(meta.root_attrs["title"], serde_json::json!("Test Dataset"));
+        assert_eq!(meta.root_attrs["version"], serde_json::json!(1));
+    }
+
+    // --- array parsing ---
+
+    #[test]
+    fn parse_single_array() {
+        let json = minimal_zmetadata(
+            r#""temperature/.zarray": { "shape": [365, 180, 360], "dtype": "<f4" }"#,
+        );
+        let meta = parse_json(&json).unwrap();
+        assert_eq!(meta.arrays.len(), 1);
+        assert_eq!(meta.arrays[0].name, "temperature");
+        assert_eq!(meta.arrays[0].shape, vec![365, 180, 360]);
+        assert_eq!(meta.arrays[0].dtype, "<f4");
+    }
+
+    #[test]
+    fn parse_multiple_arrays() {
+        let json = minimal_zmetadata(
+            r#"
+            "temperature/.zarray": { "shape": [365, 180, 360], "dtype": "<f4" },
+            "pressure/.zarray": { "shape": [365, 180, 360], "dtype": "<f8" },
+            "time/.zarray": { "shape": [365], "dtype": "<i8" }
+            "#,
+        );
+        let meta = parse_json(&json).unwrap();
+        assert_eq!(meta.arrays.len(), 3);
+        let names: Vec<&str> = meta.arrays.iter().map(|a| a.name.as_str()).collect();
+        assert!(names.contains(&"temperature"));
+        assert!(names.contains(&"pressure"));
+        assert!(names.contains(&"time"));
+    }
+
+    #[test]
+    fn parse_no_arrays_errors() {
+        let json = r#"{
+            "zarr_format": 2,
+            "metadata": {
+                ".zgroup": { "zarr_format": 2 },
+                ".zattrs": {}
+            }
+        }"#;
+        let result = parse_json(json);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("No arrays found"));
+    }
+
+    // --- dimensions from _ARRAY_DIMENSIONS ---
+
+    #[test]
+    fn parse_dimensions() {
+        let json = minimal_zmetadata(
+            r#"
+            "temperature/.zarray": { "shape": [365, 180, 360], "dtype": "<f4" },
+            "temperature/.zattrs": { "_ARRAY_DIMENSIONS": ["time", "lat", "lon"] }
+            "#,
+        );
+        let meta = parse_json(&json).unwrap();
+        assert_eq!(meta.arrays[0].dims, vec!["time", "lat", "lon"]);
+    }
+
+    #[test]
+    fn parse_no_dimensions() {
+        let json = minimal_zmetadata(
+            r#""data/.zarray": { "shape": [100], "dtype": "<f4" }"#,
+        );
+        let meta = parse_json(&json).unwrap();
+        assert!(meta.arrays[0].dims.is_empty());
+    }
+
+    // --- array attrs (non-dimension) ---
+
+    #[test]
+    fn parse_array_attrs_excludes_array_dimensions() {
+        let json = minimal_zmetadata(
+            r#"
+            "temperature/.zarray": { "shape": [365], "dtype": "<f4" },
+            "temperature/.zattrs": {
+                "_ARRAY_DIMENSIONS": ["time"],
+                "units": "K",
+                "long_name": "Temperature"
+            }
+            "#,
+        );
+        let meta = parse_json(&json).unwrap();
+        // _ARRAY_DIMENSIONS should not appear in attrs
+        assert!(!meta.arrays[0].attrs.contains_key("_ARRAY_DIMENSIONS"));
+        assert_eq!(meta.arrays[0].attrs["units"], serde_json::json!("K"));
+        assert_eq!(
+            meta.arrays[0].attrs["long_name"],
+            serde_json::json!("Temperature")
+        );
+    }
+
+    // --- missing/empty shape and dtype ---
+
+    #[test]
+    fn parse_missing_shape_defaults_empty() {
+        let json = minimal_zmetadata(
+            r#""data/.zarray": { "dtype": "<f4" }"#,
+        );
+        let meta = parse_json(&json).unwrap();
+        assert!(meta.arrays[0].shape.is_empty());
+    }
+
+    #[test]
+    fn parse_missing_dtype_defaults_empty() {
+        let json = minimal_zmetadata(
+            r#""data/.zarray": { "shape": [10] }"#,
+        );
+        let meta = parse_json(&json).unwrap();
+        assert_eq!(meta.arrays[0].dtype, "");
+    }
+
+    // --- invalid JSON ---
+
+    #[test]
+    fn parse_invalid_json_errors() {
+        let result = parse_json("not json at all");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn parse_missing_metadata_key_errors() {
+        let result = parse_json(r#"{ "zarr_format": 2 }"#);
+        assert!(result.is_err());
+    }
 }
