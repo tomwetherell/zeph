@@ -1,7 +1,7 @@
 mod help;
 mod summary;
 
-use crate::zarr::store::StoreLocation;
+use zeph::zarr::store::StoreLocation;
 
 pub struct Ctx {
     pub store: StoreLocation,

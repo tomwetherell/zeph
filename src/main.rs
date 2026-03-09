@@ -2,11 +2,10 @@ mod cli;
 mod commands;
 mod repl;
 mod ui;
-mod zarr;
 
 use clap::Parser;
 use commands::Ctx;
-use zarr::store::StoreLocation;
+use zeph::zarr::store::StoreLocation;
 
 fn main() -> anyhow::Result<()> {
     // Ensure terminal is restored on panic

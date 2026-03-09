@@ -6,8 +6,8 @@ use crossterm::style::{Print, ResetColor, SetForegroundColor};
 
 use super::{CommandResult, CommandAction, Ctx};
 use crate::ui::style;
-use crate::zarr::metadata::{self, ArrayMeta, StoreMeta};
-use crate::zarr::store::StoreLocation;
+use zeph::zarr::metadata::{self, ArrayMeta, StoreMeta};
+use zeph::zarr::store::StoreLocation;
 
 pub fn run(ctx: &Ctx) -> CommandResult {
     let mut out = io::stdout();
@@ -311,7 +311,7 @@ fn dir_size_bytes(path: &Path) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::zarr::metadata::ArrayMeta;
+    use zeph::zarr::metadata::ArrayMeta;
     use std::collections::BTreeMap;
 
     fn make_array(name: &str, dims: &[&str], shape: &[usize], dtype: &str) -> ArrayMeta {
