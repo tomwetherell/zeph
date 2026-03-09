@@ -112,6 +112,11 @@ cargo test -- --ignored
 |----------|---------|------|
 | GCS      | CMIP6   | `gs://cmip6/CMIP6/CMIP/MPI-M/MPI-ESM1-2-LR/historical/r10i1p1f1/day/pr/gn/v20190710` |
 | S3       | MUR SST | `s3://mur-sst/zarr/` |
+| HTTPS    | CMIP6   | `https://storage.googleapis.com/cmip6/CMIP6/CMIP/MPI-M/MPI-ESM1-2-LR/historical/r10i1p1f1/day/pr/gn/v20190710` |
+
+The GCS and HTTPS tests point at the same underlying dataset via different protocols, which lets us verify that both code paths produce identical results.
+
+The S3 test also exercises the `detect_s3_region()` auto-detection path, since no `AWS_DEFAULT_REGION` env var will be set.
 
 ### What to assert
 
@@ -119,7 +124,7 @@ Keep assertions stable — only check properties unlikely to change:
 
 - `parse_store()` succeeds without error
 - Expected array names are present
-- Array count is within a reasonable range
+- Exact array count (public scientific datasets rarely add/remove variables — pin the count and loosen only if it proves flaky)
 - Zarr format version
 
 ### Example
@@ -128,7 +133,10 @@ Keep assertions stable — only check properties unlikely to change:
 #[test]
 #[ignore] // requires network
 fn cloud_gcs_cmip6() {
-    let location = StoreLocation::parse("gs://cmip6/CMIP6/CMIP/MPI-M/...").unwrap();
+    let location = StoreLocation::parse(
+        "gs://cmip6/CMIP6/CMIP/MPI-M/MPI-ESM1-2-LR/historical/r10i1p1f1/day/pr/gn/v20190710",
+    )
+    .unwrap();
     let runtime = tokio::runtime::Runtime::new().unwrap();
     let meta = parse_store(&location, &runtime).unwrap();
 
@@ -142,6 +150,7 @@ fn cloud_gcs_cmip6() {
 - **Rendered terminal output**: The summary rendering is still evolving. Snapshot tests (e.g. with `insta`) would add maintenance burden for cosmetic changes. Revisit once the output format stabilises.
 - **REPL / interactive input**: Raw mode input handling and autocomplete are tightly coupled to the terminal. These are best tested manually for now.
 - **Authenticated cloud stores**: No test coverage for stores requiring credentials until we have a way to manage test credentials.
+- **Azure cloud stores**: The codebase supports Azure (`az://` and `https://*.blob.core.windows.net`) but no publicly accessible anonymous Zarr V2 stores on Azure Blob Storage have been identified. Azure Planetary Computer datasets require an SAS token. Revisit if a suitable public store becomes available.
 
 ## Running Tests
 
