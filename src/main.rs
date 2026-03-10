@@ -3,12 +3,13 @@ mod commands;
 mod repl;
 mod ui;
 
-use std::io::{self, Write};
+use std::io;
 
 use clap::Parser;
 use crossterm::style::{Print, ResetColor, SetForegroundColor};
 
 use commands::Ctx;
+use ui::spinner::Spinner;
 use zeph::zarr::metadata::{self, FetchError};
 use zeph::zarr::store::StoreLocation;
 
@@ -32,45 +33,29 @@ fn main() -> anyhow::Result<()> {
     let store = StoreLocation::parse(&input)?;
     let runtime = tokio::runtime::Runtime::new()?;
 
-    // For remote stores, show a brief status while connecting.
+    // For remote stores, show an animated spinner while connecting.
     let is_remote = matches!(store, StoreLocation::Cloud { .. });
-    if is_remote {
-        let mut out = io::stdout();
-        let _ = crossterm::execute!(
-            out,
-            Print("\n"),
-            SetForegroundColor(ui::style::DIM),
-            Print(format!("  Connecting to {} ...", store.display_path())),
-            ResetColor,
-        );
-        let _ = out.flush();
-    }
+    let spinner = if is_remote {
+        Some(Spinner::start(&format!(
+            "Connecting to {} ...",
+            store.display_path()
+        )))
+    } else {
+        None
+    };
 
     let meta = match metadata::fetch_store_meta(&store, &runtime) {
         Ok(meta) => {
-            if is_remote {
-                // Clear the "Connecting..." line and move up to consume the leading \n
-                let mut out = io::stdout();
-                let _ = crossterm::execute!(
-                    out,
-                    Print("\r"),
-                    crossterm::terminal::Clear(crossterm::terminal::ClearType::CurrentLine),
-                    crossterm::cursor::MoveUp(1),
-                );
+            if let Some(sp) = spinner {
+                sp.stop_with_message(&["Fetched .zmetadata"]);
             }
             meta
         }
         Err(e) => {
-            let mut out = io::stderr();
-            if is_remote {
-                // Clear the "Connecting..." line and move up to consume the leading \n
-                let _ = crossterm::execute!(
-                    out,
-                    Print("\r"),
-                    crossterm::terminal::Clear(crossterm::terminal::ClearType::CurrentLine),
-                    crossterm::cursor::MoveUp(1),
-                );
+            if let Some(sp) = spinner {
+                sp.stop_with_message(&["Error fetching .zmetadata"]);
             }
+            let mut out = io::stderr();
             let _ = crossterm::execute!(
                 out,
                 Print("\n"),
