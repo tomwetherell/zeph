@@ -23,7 +23,6 @@ pub fn run(_ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
             .collect();
         format!("  ({})", parts.join(", "))
     };
-    let _ = crossterm::execute!(out, Print("\n"));
     let _ = crossterm::execute!(
         out,
         Print("  "),

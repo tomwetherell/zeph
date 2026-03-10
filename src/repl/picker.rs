@@ -36,7 +36,7 @@ pub fn run(arrays: &[ArrayMeta]) -> anyhow::Result<Option<usize>> {
         out,
         Print("\n"),
         SetForegroundColor(style::HEADING),
-        Print("  Select a variable: "),
+        Print("  Select a variable (type to filter): "),
         ResetColor,
     )?;
 
