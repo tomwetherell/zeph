@@ -486,7 +486,7 @@ mod tests {
         );
         let msg = err.to_string();
         assert!(msg.contains("No .zmetadata file found"), "Message: {msg}");
-        assert!(msg.contains("zarr.consolidate_metadata"), "Message: {msg}");
+        assert!(msg.contains("zarr.readthedocs.io"), "Message: {msg}");
     }
 
     #[test]

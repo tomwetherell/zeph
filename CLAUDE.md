@@ -23,6 +23,14 @@ cargo run                    # start zeph in current directory
 cargo run -- <path>          # start zeph with a zarr store path
 ```
 
+## Testing
+
+After making changes, always run the tests to check for regressions:
+
+```
+cargo test
+```
+
 ## Project Structure
 
 ```
