@@ -79,7 +79,7 @@ fn fetch_raw_zmetadata(
             std::fs::read_to_string(&zmetadata_path).map_err(|e| {
                 if e.kind() == std::io::ErrorKind::NotFound {
                     FetchError::NoConsolidatedMetadata(format!(
-                        "No .zmetadata file found in {}.\n\
+                        "No .zmetadata file found in {}\n\
                          Zeph requires consolidated metadata.\n\
                          See https://zarr.readthedocs.io/en/latest/user-guide/consolidated_metadata/",
                         store_path.display(),

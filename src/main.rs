@@ -49,12 +49,13 @@ fn main() -> anyhow::Result<()> {
     let meta = match metadata::fetch_store_meta(&store, &runtime) {
         Ok(meta) => {
             if is_remote {
-                // Clear the "Connecting..." line
+                // Clear the "Connecting..." line and move up to consume the leading \n
                 let mut out = io::stdout();
                 let _ = crossterm::execute!(
                     out,
                     Print("\r"),
                     crossterm::terminal::Clear(crossterm::terminal::ClearType::CurrentLine),
+                    crossterm::cursor::MoveUp(1),
                 );
             }
             meta
@@ -62,11 +63,12 @@ fn main() -> anyhow::Result<()> {
         Err(e) => {
             let mut out = io::stderr();
             if is_remote {
-                // Move to a new line after "Connecting..."
+                // Clear the "Connecting..." line and move up to consume the leading \n
                 let _ = crossterm::execute!(
                     out,
                     Print("\r"),
                     crossterm::terminal::Clear(crossterm::terminal::ClearType::CurrentLine),
+                    crossterm::cursor::MoveUp(1),
                 );
             }
             let _ = crossterm::execute!(
