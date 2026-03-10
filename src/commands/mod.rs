@@ -1,7 +1,8 @@
 mod help;
-mod summary;
+mod info;
+pub(crate) mod summary;
 
-use zeph::zarr::metadata::StoreMeta;
+use zeph::zarr::metadata::{ArrayMeta, StoreMeta};
 use zeph::zarr::store::StoreLocation;
 
 pub struct Ctx {
@@ -9,11 +10,16 @@ pub struct Ctx {
     pub meta: StoreMeta,
 }
 
+pub enum Handler {
+    Immediate(fn(&Ctx) -> CommandResult),
+    TargetSelect(fn(&Ctx, &ArrayMeta) -> CommandResult),
+}
+
 pub struct Command {
     pub name: &'static str,
     pub description: &'static str,
     pub aliases: &'static [&'static str],
-    pub handler: fn(&Ctx) -> CommandResult,
+    pub handler: Handler,
 }
 
 pub enum CommandAction {
@@ -32,35 +38,28 @@ pub fn all_commands() -> Vec<Command> {
             name: "/summary",
             description: "Show store overview",
             aliases: &[],
-            handler: summary::run,
+            handler: Handler::Immediate(summary::run),
+        },
+        Command {
+            name: "/info",
+            description: "Show variable details",
+            aliases: &[],
+            handler: Handler::TargetSelect(info::run),
         },
         Command {
             name: "/help",
             description: "Show available commands",
             aliases: &[],
-            handler: help::run,
+            handler: Handler::Immediate(help::run),
         },
         Command {
             name: "/exit",
             description: "Exit zeph",
             aliases: &["/quit"],
-            handler: |_| CommandResult {
+            handler: Handler::Immediate(|_| CommandResult {
                 action: CommandAction::Quit,
                 subtitle: Some("Bye!".into()),
-            },
+            }),
         },
     ]
-}
-
-pub fn execute(name: &str, ctx: &Ctx) -> CommandResult {
-    for cmd in all_commands() {
-        if cmd.name == name {
-            return (cmd.handler)(ctx);
-        }
-    }
-    eprintln!("Unknown command: {name}");
-    CommandResult {
-        action: CommandAction::Continue,
-        subtitle: None,
-    }
 }

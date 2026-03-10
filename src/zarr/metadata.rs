@@ -15,6 +15,11 @@ pub struct ArrayMeta {
     pub dtype: String,
     pub dims: Vec<String>,
     pub attrs: BTreeMap<String, Value>,
+    pub chunks: Vec<usize>,
+    pub compressor: Option<Value>,
+    pub fill_value: Option<Value>,
+    pub order: Option<String>,
+    pub filters: Option<Value>,
 }
 
 #[derive(Debug)]
@@ -211,6 +216,33 @@ fn parse_zmetadata(raw: &str) -> anyhow::Result<StoreMeta> {
             .unwrap_or("")
             .to_string();
 
+        let chunks: Vec<usize> = zarray_val
+            .get("chunks")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_u64().map(|n| n as usize))
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let compressor = zarray_val
+            .get("compressor")
+            .filter(|v| !v.is_null())
+            .cloned();
+
+        let fill_value = zarray_val.get("fill_value").cloned();
+
+        let order = zarray_val
+            .get("order")
+            .and_then(|v| v.as_str())
+            .map(String::from);
+
+        let filters = zarray_val
+            .get("filters")
+            .filter(|v| !v.is_null())
+            .cloned();
+
         let mut attrs: BTreeMap<String, Value> = BTreeMap::new();
         let mut dims = Vec::new();
 
@@ -237,6 +269,11 @@ fn parse_zmetadata(raw: &str) -> anyhow::Result<StoreMeta> {
             dtype,
             dims,
             attrs,
+            chunks,
+            compressor,
+            fill_value,
+            order,
+            filters,
         });
     }
 
@@ -433,6 +470,127 @@ mod tests {
             meta.arrays[0].attrs["long_name"],
             serde_json::json!("Temperature")
         );
+    }
+
+    // --- storage fields (chunks, compressor, fill_value, order, filters) ---
+
+    #[test]
+    fn parse_chunks() {
+        let json = minimal_zmetadata(
+            r#""data/.zarray": { "shape": [100, 50], "dtype": "<f4", "chunks": [10, 25] }"#,
+        );
+        let meta = parse_json(&json).unwrap();
+        assert_eq!(meta.arrays[0].chunks, vec![10, 25]);
+    }
+
+    #[test]
+    fn parse_missing_chunks_defaults_empty() {
+        let json = minimal_zmetadata(
+            r#""data/.zarray": { "shape": [100], "dtype": "<f4" }"#,
+        );
+        let meta = parse_json(&json).unwrap();
+        assert!(meta.arrays[0].chunks.is_empty());
+    }
+
+    #[test]
+    fn parse_compressor_blosc() {
+        let json = minimal_zmetadata(
+            r#""data/.zarray": { "shape": [10], "dtype": "<f4", "compressor": { "id": "blosc", "cname": "lz4", "clevel": 5 } }"#,
+        );
+        let meta = parse_json(&json).unwrap();
+        let comp = meta.arrays[0].compressor.as_ref().unwrap();
+        assert_eq!(comp["id"], serde_json::json!("blosc"));
+        assert_eq!(comp["cname"], serde_json::json!("lz4"));
+    }
+
+    #[test]
+    fn parse_null_compressor() {
+        let json = minimal_zmetadata(
+            r#""data/.zarray": { "shape": [10], "dtype": "<f4", "compressor": null }"#,
+        );
+        let meta = parse_json(&json).unwrap();
+        assert!(meta.arrays[0].compressor.is_none());
+    }
+
+    #[test]
+    fn parse_missing_compressor() {
+        let json = minimal_zmetadata(
+            r#""data/.zarray": { "shape": [10], "dtype": "<f4" }"#,
+        );
+        let meta = parse_json(&json).unwrap();
+        assert!(meta.arrays[0].compressor.is_none());
+    }
+
+    #[test]
+    fn parse_fill_value_string() {
+        let json = minimal_zmetadata(
+            r#""data/.zarray": { "shape": [10], "dtype": "<f4", "fill_value": "NaN" }"#,
+        );
+        let meta = parse_json(&json).unwrap();
+        assert_eq!(meta.arrays[0].fill_value, Some(serde_json::json!("NaN")));
+    }
+
+    #[test]
+    fn parse_fill_value_null() {
+        let json = minimal_zmetadata(
+            r#""data/.zarray": { "shape": [10], "dtype": "<f4", "fill_value": null }"#,
+        );
+        let meta = parse_json(&json).unwrap();
+        assert_eq!(meta.arrays[0].fill_value, Some(serde_json::Value::Null));
+    }
+
+    #[test]
+    fn parse_fill_value_numeric() {
+        let json = minimal_zmetadata(
+            r#""data/.zarray": { "shape": [10], "dtype": "<f4", "fill_value": 0 }"#,
+        );
+        let meta = parse_json(&json).unwrap();
+        assert_eq!(meta.arrays[0].fill_value, Some(serde_json::json!(0)));
+    }
+
+    #[test]
+    fn parse_missing_fill_value() {
+        let json = minimal_zmetadata(
+            r#""data/.zarray": { "shape": [10], "dtype": "<f4" }"#,
+        );
+        let meta = parse_json(&json).unwrap();
+        assert!(meta.arrays[0].fill_value.is_none());
+    }
+
+    #[test]
+    fn parse_order() {
+        let json = minimal_zmetadata(
+            r#""data/.zarray": { "shape": [10], "dtype": "<f4", "order": "F" }"#,
+        );
+        let meta = parse_json(&json).unwrap();
+        assert_eq!(meta.arrays[0].order, Some("F".to_string()));
+    }
+
+    #[test]
+    fn parse_missing_order() {
+        let json = minimal_zmetadata(
+            r#""data/.zarray": { "shape": [10], "dtype": "<f4" }"#,
+        );
+        let meta = parse_json(&json).unwrap();
+        assert!(meta.arrays[0].order.is_none());
+    }
+
+    #[test]
+    fn parse_null_filters() {
+        let json = minimal_zmetadata(
+            r#""data/.zarray": { "shape": [10], "dtype": "<f4", "filters": null }"#,
+        );
+        let meta = parse_json(&json).unwrap();
+        assert!(meta.arrays[0].filters.is_none());
+    }
+
+    #[test]
+    fn parse_missing_filters() {
+        let json = minimal_zmetadata(
+            r#""data/.zarray": { "shape": [10], "dtype": "<f4" }"#,
+        );
+        let meta = parse_json(&json).unwrap();
+        assert!(meta.arrays[0].filters.is_none());
     }
 
     // --- missing/empty shape and dtype ---

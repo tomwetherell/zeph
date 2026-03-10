@@ -236,7 +236,7 @@ fn format_shape(shape: &[usize]) -> String {
         .join(" x ")
 }
 
-fn friendly_dtype(dtype: &str) -> &str {
+pub(crate) fn friendly_dtype(dtype: &str) -> &str {
     match dtype {
         "<f4" | ">f4" => "float32",
         "<f8" | ">f8" => "float64",
@@ -264,8 +264,7 @@ fn store_size_str(location: &StoreLocation) -> String {
     }
 }
 
-fn dir_size_human(path: &Path) -> String {
-    let bytes = dir_size_bytes(path);
+pub(crate) fn format_bytes(bytes: u64) -> String {
     if bytes < 1024 {
         format!("{bytes} B")
     } else if bytes < 1024 * 1024 {
@@ -275,6 +274,10 @@ fn dir_size_human(path: &Path) -> String {
     } else {
         format!("{:.1} GB", bytes as f64 / (1024.0 * 1024.0 * 1024.0))
     }
+}
+
+fn dir_size_human(path: &Path) -> String {
+    format_bytes(dir_size_bytes(path))
 }
 
 fn dir_size_bytes(path: &Path) -> u64 {
@@ -308,6 +311,11 @@ mod tests {
             shape: shape.to_vec(),
             dtype: dtype.to_string(),
             attrs: BTreeMap::new(),
+            chunks: Vec::new(),
+            compressor: None,
+            fill_value: None,
+            order: None,
+            filters: None,
         }
     }
 

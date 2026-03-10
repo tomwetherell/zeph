@@ -70,6 +70,24 @@ fn parse_wb2_era5_fixture() {
     assert_eq!(lsm.dtype, "<f4");
     assert_eq!(lsm.dims, vec!["longitude", "latitude"]);
 
+    // --- New storage fields ---
+
+    assert_eq!(temp.chunks, vec![100, 13, 64, 32]);
+    assert!(temp.compressor.is_some());
+    let comp = temp.compressor.as_ref().unwrap();
+    assert_eq!(comp["id"], serde_json::json!("blosc"));
+    assert_eq!(comp["cname"], serde_json::json!("lz4"));
+    assert_eq!(comp["clevel"], serde_json::json!(5));
+    assert_eq!(temp.fill_value, Some(serde_json::json!("NaN")));
+    assert_eq!(temp.order, Some("C".to_string()));
+    assert!(temp.filters.is_none());
+
+    // Coordinate also has storage fields
+    assert_eq!(time.chunks, vec![23386]);
+    assert!(time.compressor.is_some());
+    assert_eq!(time.fill_value, Some(serde_json::Value::Null));
+    assert_eq!(time.order, Some("C".to_string()));
+
     // --- _ARRAY_DIMENSIONS should not leak into attrs ---
 
     for arr in &meta.arrays {
