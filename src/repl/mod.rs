@@ -25,7 +25,10 @@ pub fn run(ctx: &Ctx) -> anyhow::Result<()> {
                     let _ = out.flush();
                 }
                 match result.action {
-                    CommandAction::Quit => break,
+                    CommandAction::Quit => {
+                        println!();
+                        break;
+                    }
                     CommandAction::Continue => {}
                 }
             }
