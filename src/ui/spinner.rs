@@ -22,14 +22,15 @@ pub struct Spinner {
 }
 
 impl Spinner {
-    /// Start a spinner with the given message (e.g. "Connecting to s3://...").
+    /// Start a spinner with a label (pink) and optional detail (black, in parens).
     ///
     /// The spinner prints on its own line and cycles through the frame
     /// characters at the front of the line.
-    pub fn start(message: &str) -> Self {
+    pub fn start(label: &str, detail: Option<&str>) -> Self {
         let stop_flag = Arc::new(AtomicBool::new(false));
         let flag = stop_flag.clone();
-        let msg = message.to_string();
+        let label = label.to_string();
+        let detail = detail.map(|s| s.to_string());
 
         let handle = thread::spawn(move || {
             let mut out = io::stdout();
@@ -41,9 +42,16 @@ impl Spinner {
                     Print("\r"),
                     Clear(ClearType::CurrentLine),
                     SetForegroundColor(style::HEADING),
-                    Print(format!("  {frame} {msg}")),
-                    ResetColor,
+                    Print(format!("  {frame} {label}")),
                 );
+                if let Some(ref d) = detail {
+                    let _ = crossterm::execute!(
+                        out,
+                        SetForegroundColor(style::DIM_DARK),
+                        Print(format!(" ({d})")),
+                    );
+                }
+                let _ = crossterm::execute!(out, ResetColor);
                 let _ = out.flush();
 
                 // Sleep in small increments so we can respond to stop quickly.

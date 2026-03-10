@@ -36,10 +36,10 @@ fn main() -> anyhow::Result<()> {
     // For remote stores, show an animated spinner while connecting.
     let is_remote = matches!(store, StoreLocation::Cloud { .. });
     let spinner = if is_remote {
-        Some(Spinner::start(&format!(
-            "Connecting to {} ...",
-            store.display_path()
-        )))
+        Some(Spinner::start(
+            "Connecting...",
+            Some(&store.display_path()),
+        ))
     } else {
         None
     };

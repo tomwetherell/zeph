@@ -11,6 +11,11 @@ pub const DIM: Color = Color::Rgb {
     g: 140,
     b: 140,
 };
+pub const DIM_DARK: Color = Color::Rgb {
+    r: 110,
+    g: 110,
+    b: 110,
+};
 pub const INPUT_BG: Color = Color::Rgb {
     r: 240,
     g: 240,
