@@ -35,9 +35,7 @@ pub fn run(arrays: &[ArrayMeta]) -> anyhow::Result<Option<usize>> {
     crossterm::execute!(
         out,
         Print("\n"),
-        SetForegroundColor(style::HEADING),
         Print("  Select a variable (type to filter): "),
-        ResetColor,
     )?;
 
     // Ensure enough room below for the menu
@@ -157,14 +155,18 @@ fn draw_picker(
     crossterm::queue!(out, cursor::SavePosition)?;
 
     for (i, (_, arr)) in items.iter().enumerate() {
+        // Blank line before the first item to separate from the prompt
+        if i == 0 {
+            crossterm::queue!(out, Print("\n\r"))?;
+        }
         crossterm::queue!(out, Print("\n\r"), Clear(ClearType::CurrentLine))?;
 
         let text = format_item(arr);
         if i == selected {
             crossterm::queue!(
                 out,
-                Print("    "),
                 SetForegroundColor(style::HEADING),
+                Print("  ❯ "),
                 Print(&text),
                 ResetColor,
             )?;
@@ -179,8 +181,10 @@ fn draw_picker(
         }
     }
 
-    // Clear leftover lines from previous render
-    for _ in items.len()..prev_count {
+    // Clear leftover lines from previous render (+1 for the separator line)
+    let total = if items.is_empty() { 0 } else { items.len() + 1 };
+    let prev_total = if prev_count == 0 { 0 } else { prev_count + 1 };
+    for _ in total..prev_total {
         crossterm::queue!(out, Print("\n\r"), Clear(ClearType::CurrentLine))?;
     }
 
@@ -191,8 +195,9 @@ fn draw_picker(
 }
 
 fn clear_picker(out: &mut impl Write, item_count: usize) -> anyhow::Result<()> {
+    let total = if item_count == 0 { 0 } else { item_count + 1 }; // +1 for separator line
     crossterm::queue!(out, cursor::SavePosition)?;
-    for _ in 0..item_count {
+    for _ in 0..total {
         crossterm::queue!(out, Print("\n\r"), Clear(ClearType::CurrentLine))?;
     }
     crossterm::queue!(out, cursor::RestorePosition)?;
