@@ -1,11 +1,12 @@
 mod help;
 mod summary;
 
+use zeph::zarr::metadata::StoreMeta;
 use zeph::zarr::store::StoreLocation;
 
 pub struct Ctx {
     pub store: StoreLocation,
-    pub runtime: tokio::runtime::Runtime,
+    pub meta: StoreMeta,
 }
 
 pub struct Command {

@@ -33,6 +33,7 @@ Groups are uncommon in the "single xarray Dataset" case (which is the most commo
 ## What Information Scientists and Engineers Want to See
 
 ### Store-level
+
 - Zarr format version (v2 vs v3)
 - Total size on disk
 - Root group attributes/metadata
@@ -40,11 +41,13 @@ Groups are uncommon in the "single xarray Dataset" case (which is the most commo
 - Store type (local filesystem, S3, GCS, etc.)
 
 ### Group-level
+
 - Group path within hierarchy
 - Attributes (user-defined metadata, e.g. `Conventions: "CF-1.8"`)
 - Child groups and arrays
 
 ### Array (variable) level
+
 - Shape, dtype, dimension names
 - Chunk shape and chunk layout (regular vs sharded)
 - Compression codec (e.g. blosc, zstd, gzip) and settings
@@ -54,6 +57,7 @@ Groups are uncommon in the "single xarray Dataset" case (which is the most commo
 - Number of chunks, how many are initialized vs missing
 
 ### Data-level (deeper inspection)
+
 - Actual data values (head/tail/slice)
 - Statistics (min, max, mean, NaN count)
 - Coordinate values (for dimension arrays like `time`, `lat`, `lon`)
@@ -91,6 +95,7 @@ Attributes:
 ```
 
 This is reconstructed by:
+
 1. Reading `_ARRAY_DIMENSIONS` (v2) or `dimension_names` (v3) from each array
 2. Reading the root `coordinates` attribute to distinguish coords from data vars
 3. Inferring dimensions from the union of all dimension names + their sizes
@@ -121,11 +126,11 @@ The deep dive on a single array or group. This is where you see codec, compressi
 
 After running `/info`, the user is prompted with an interactive selection list of all variables and groups in the store. They arrow-key to one and hit enter.
 
-Distinct from `/summary` because it's *deep on one thing* vs *wide on everything*.
+Distinct from `/summary` because it's _deep on one thing_ vs _wide on everything_.
 
 #### `/attrs` — attributes/metadata
 
-Separated from `/info` because attributes can be verbose (CF conventions can store dozens of attributes). Scientists frequently want *just* the attrs.
+Separated from `/info` because attributes can be verbose (CF conventions can store dozens of attributes). Scientists frequently want _just_ the attrs.
 
 Prompts with a selection list: root group, plus all variables/groups. Selecting root shows store-level attributes.
 
@@ -165,12 +170,14 @@ Arguments would be better for power users who want speed (typing `/info temperat
 ### Command categories
 
 **Immediate commands** (no follow-up needed):
+
 - `/summary` — runs immediately, shows the full store overview
 - `/tree` — runs immediately, shows the hierarchy
 - `/help` — runs immediately
 - `/exit` — runs immediately
 
 **Target-selection commands** (prompt for a variable/group):
+
 - `/info` — select from all variables and groups
 - `/attrs` — select from root group + all variables/groups
 - `/data` — select from variables only (then optionally refine slice)
@@ -201,14 +208,71 @@ Each step is a small, focused interaction rather than one complex command with s
 Currently commands have the signature `fn() -> CommandResult`. This will need to change:
 
 - Commands declare whether they need a target (variable/group selection)
-- The REPL handles the interactive selection *before* calling the handler
+- The REPL handles the interactive selection _before_ calling the handler
 - The handler receives the selected target as context
 - This keeps interactive logic in the REPL layer rather than scattered across individual command handlers
 
+## Startup Validation and Metadata Caching
+
+### The problem
+
+Currently, no validation happens until the user runs a command. For remote stores, `StoreLocation::parse` just constructs the `object_store` client without hitting the network. A typo'd bucket, missing credentials, or non-zarr directory all surface as cryptic errors only when the user runs `/summary`.
+
+### Decision: eagerly fetch `.zmetadata` on startup
+
+On startup, immediately after parsing the store location, attempt to read and parse `.zmetadata`. This serves three purposes at once:
+
+1. **Validates the store** — confirms it exists, is accessible, and is a valid zarr store
+2. **Validates credentials** — surfaces auth errors before the user starts interacting
+3. **Populates the metadata cache** — every subsequent command (`/summary`, `/info`, `/attrs`, the variable picker) is instant
+
+### Consolidated metadata requirement
+
+Zeph requires consolidated metadata (`.zmetadata` file) for now. This covers the vast majority of zarr stores in practice — xarray always writes `.zmetadata` when saving to zarr. Stores without consolidated metadata (raw zarr, some zarr v3 stores) are not supported. A clear error message should explain this limitation and suggest running `zarr.consolidate_metadata()` in Python.
+
+This can be extended later to fall back to reading individual `.zgroup` + `.zarray` files, but that's a separate concern.
+
+### Local stores
+
+Local validation is straightforward:
+- Path existence is already checked in `StoreLocation::parse`
+- Read `.zmetadata` from the filesystem (fast, no spinner needed)
+- If `.zmetadata` is missing: error out with a message explaining consolidated metadata is required
+- If `.zmetadata` is malformed: error out with a parse error
+
+### Remote stores
+
+Remote stores show a brief status message while connecting:
+
+```
+  Connecting to s3://mur-sst/zarr/ ...
+```
+
+On success, the welcome box renders with store info already available from the cached metadata.
+
+On failure, display provider-specific error messages. The `object_store` crate gives us distinct error variants for each failure mode:
+
+| `object_store::Error` variant | Meaning | Example message |
+|---|---|---|
+| `NotFound` | Bucket or path doesn't exist | `Store not found at s3://mur-stt/zarr/. Check the URL is correct.` |
+| `Unauthenticated` | Missing or invalid credentials (401) | `Authentication required for s3://bucket/path. Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY, or configure AWS_PROFILE.` |
+| `PermissionDenied` | Insufficient permissions (403) | `Permission denied for s3://bucket/path. Your credentials may not have access to this store.` |
+| `Generic` | Network error, DNS failure, etc. | `Could not connect to s3://bucket/path: <underlying error>` |
+
+Auth error messages should include the relevant environment variables for each provider:
+- **S3**: `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY`, or `AWS_PROFILE`
+- **GCS**: `GOOGLE_APPLICATION_CREDENTIALS`, or `gcloud auth application-default login`
+- **Azure**: `AZURE_STORAGE_ACCOUNT_NAME` + `AZURE_STORAGE_ACCOUNT_KEY`, or `AZURE_CLIENT_ID`
+
+### Metadata cache on `Ctx`
+
+The parsed `StoreMeta` is stored on `Ctx` and shared across all commands. Since `.zmetadata` is a snapshot of the store's structure, it won't change during a zeph session, so caching is safe.
+
+Commands that need data beyond metadata (actual array values for `/data`, chunk listings for `/chunks`) still make their own requests — only the metadata parse is cached.
+
 ## Open Questions
 
-1. **Auto-summary on startup** — should `/summary` run automatically when zeph opens on a store? Could be a nice UX — you open zeph and immediately see what's in it.
+1. **Auto-summary on startup** — should `/summary` run automatically when zeph opens on a store? Could be a nice UX — you open zeph and immediately see what's in it. With metadata already cached from startup validation, this would be essentially free.
 2. **Output format for `/data`** — tabular? Should we handle 1D, 2D, and nD differently? Scientists often want a pandas-DataFrame-like view for 2D slices.
-3. **Remote stores and latency** — for S3/GCS stores, latency changes everything. May need progress indicators for slow operations, or cache metadata on first read.
-4. **xarray convention detection** — how confidently can we detect whether a store follows xarray conventions? What's the fallback experience?
-5. **Grouped store navigation** — for stores with groups, should the selection list show flat paths (`/scale0/image`) or navigate hierarchically (select group, then select array within it)?
+3. **xarray convention detection** — how confidently can we detect whether a store follows xarray conventions? What's the fallback experience?
+4. **Grouped store navigation** — for stores with groups, should the selection list show flat paths (`/scale0/image`) or navigate hierarchically (select group, then select array within it)?

@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::fmt;
 
 use anyhow::{bail, Context};
 use object_store::ObjectStoreExt;
@@ -23,31 +24,142 @@ pub struct StoreMeta {
     pub arrays: Vec<ArrayMeta>,
 }
 
+/// Describes why fetching store metadata failed.
+pub enum FetchError {
+    /// The store or path was not found (404).
+    NotFound(String),
+    /// Credentials are missing or invalid (401).
+    Unauthenticated(String),
+    /// Credentials lack permission (403).
+    PermissionDenied(String),
+    /// Local path exists but has no .zmetadata file.
+    NoConsolidatedMetadata(String),
+    /// Any other error (network, DNS, parse, etc.).
+    Other(anyhow::Error),
+}
+
+impl fmt::Display for FetchError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            FetchError::NotFound(msg) => write!(f, "{msg}"),
+            FetchError::Unauthenticated(msg) => write!(f, "{msg}"),
+            FetchError::PermissionDenied(msg) => write!(f, "{msg}"),
+            FetchError::NoConsolidatedMetadata(msg) => write!(f, "{msg}"),
+            FetchError::Other(err) => write!(f, "{err:#}"),
+        }
+    }
+}
+
+impl fmt::Debug for FetchError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(self, f)
+    }
+}
+
+/// Fetch and parse consolidated metadata (.zmetadata) from a store.
+///
+/// Returns a typed `FetchError` so callers can display provider-specific
+/// guidance for auth failures, missing stores, etc.
+pub fn fetch_store_meta(
+    location: &StoreLocation,
+    runtime: &tokio::runtime::Runtime,
+) -> Result<StoreMeta, FetchError> {
+    let raw = fetch_raw_zmetadata(location, runtime)?;
+    parse_zmetadata(&raw).map_err(FetchError::Other)
+}
+
+/// Fetch the raw .zmetadata JSON string from the store.
+fn fetch_raw_zmetadata(
+    location: &StoreLocation,
+    runtime: &tokio::runtime::Runtime,
+) -> Result<String, FetchError> {
+    match location {
+        StoreLocation::Local(store_path) => {
+            let zmetadata_path = store_path.join(".zmetadata");
+            std::fs::read_to_string(&zmetadata_path).map_err(|e| {
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    FetchError::NoConsolidatedMetadata(format!(
+                        "No .zmetadata file found in {}.\n\
+                         Zeph requires consolidated metadata.\n\
+                         See https://zarr.readthedocs.io/en/latest/user-guide/consolidated_metadata/",
+                        store_path.display(),
+                    ))
+                } else {
+                    FetchError::Other(
+                        anyhow::Error::from(e)
+                            .context(format!("Could not read {}", zmetadata_path.display())),
+                    )
+                }
+            })
+        }
+        StoreLocation::Cloud {
+            url,
+            store,
+            base_path,
+        } => {
+            let meta_path = base_path.child(".zmetadata");
+            let result = runtime.block_on(store.get(&meta_path)).map_err(|e| {
+                classify_cloud_error(e, url)
+            })?;
+            let bytes = runtime
+                .block_on(result.bytes())
+                .map_err(|e| FetchError::Other(anyhow::Error::from(e)))?;
+            String::from_utf8(bytes.to_vec())
+                .map_err(|e| FetchError::Other(anyhow::Error::from(e).context("Remote .zmetadata is not valid UTF-8")))
+        }
+    }
+}
+
+/// Map an object_store error to a FetchError with provider-specific guidance.
+fn classify_cloud_error(err: object_store::Error, url: &str) -> FetchError {
+    match err {
+        object_store::Error::NotFound { .. } => {
+            FetchError::NotFound(format!(
+                "Store not found at {url}\n\
+                 Check the URL is correct, or the store may not have consolidated metadata (.zmetadata)."
+            ))
+        }
+        object_store::Error::Unauthenticated { .. } => {
+            let guidance = auth_guidance(url);
+            FetchError::Unauthenticated(format!(
+                "Authentication required for {url}\n{guidance}"
+            ))
+        }
+        object_store::Error::PermissionDenied { .. } => {
+            FetchError::PermissionDenied(format!(
+                "Permission denied for {url}\n\
+                 Your credentials may not have access to this store."
+            ))
+        }
+        other => FetchError::Other(anyhow::Error::from(other)),
+    }
+}
+
+/// Return provider-specific credential guidance based on the URL scheme.
+fn auth_guidance(url: &str) -> String {
+    if url.starts_with("s3://") {
+        "Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY, or configure AWS_PROFILE.".to_string()
+    } else if url.starts_with("gs://") {
+        "Set GOOGLE_APPLICATION_CREDENTIALS, or run: gcloud auth application-default login"
+            .to_string()
+    } else if url.starts_with("az://") || url.contains(".blob.core.windows.net") {
+        "Set AZURE_STORAGE_ACCOUNT_NAME and AZURE_STORAGE_ACCOUNT_KEY.".to_string()
+    } else {
+        "Check that your credentials are configured correctly.".to_string()
+    }
+}
+
+/// Kept for backwards compatibility with existing call sites.
 pub fn parse_store(
     location: &StoreLocation,
     runtime: &tokio::runtime::Runtime,
 ) -> anyhow::Result<StoreMeta> {
-    let raw = match location {
-        StoreLocation::Local(store_path) => {
-            let zmetadata_path = store_path.join(".zmetadata");
-            std::fs::read_to_string(&zmetadata_path)
-                .with_context(|| format!("Could not read {}", zmetadata_path.display()))?
-        }
-        StoreLocation::Cloud {
-            store, base_path, ..
-        } => {
-            let meta_path = base_path.child(".zmetadata");
-            let result = runtime
-                .block_on(store.get(&meta_path))
-                .with_context(|| format!("Could not read .zmetadata from remote store (path: {meta_path})"))?;
-            let bytes = runtime
-                .block_on(result.bytes())
-                .context("Could not read bytes from remote .zmetadata")?;
-            String::from_utf8(bytes.to_vec())
-                .context("Remote .zmetadata is not valid UTF-8")?
-        }
-    };
-    let top: Value = serde_json::from_str(&raw).context("Invalid JSON in .zmetadata")?;
+    fetch_store_meta(location, runtime).map_err(|e| anyhow::anyhow!("{e}"))
+}
+
+/// Parse a raw .zmetadata JSON string into a StoreMeta.
+fn parse_zmetadata(raw: &str) -> anyhow::Result<StoreMeta> {
+    let top: Value = serde_json::from_str(raw).context("Invalid JSON in .zmetadata")?;
     let metadata = top
         .get("metadata")
         .and_then(|v| v.as_object())
@@ -355,5 +467,72 @@ mod tests {
     fn parse_missing_metadata_key_errors() {
         let result = parse_json(r#"{ "zarr_format": 2 }"#);
         assert!(result.is_err());
+    }
+
+    // --- fetch_store_meta error classification ---
+
+    #[test]
+    fn fetch_missing_zmetadata_returns_no_consolidated_metadata() {
+        let dir = tempfile::tempdir().unwrap();
+        // Directory exists but has no .zmetadata file
+        let location = StoreLocation::Local(dir.path().to_path_buf());
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let result = fetch_store_meta(&location, &runtime);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            matches!(err, FetchError::NoConsolidatedMetadata(_)),
+            "Expected NoConsolidatedMetadata, got: {err}"
+        );
+        let msg = err.to_string();
+        assert!(msg.contains("No .zmetadata file found"), "Message: {msg}");
+        assert!(msg.contains("zarr.consolidate_metadata"), "Message: {msg}");
+    }
+
+    #[test]
+    fn fetch_valid_store_returns_meta() {
+        let dir = tempfile::tempdir().unwrap();
+        let json = minimal_zmetadata(
+            r#""data/.zarray": { "shape": [10], "dtype": "<f4" }"#,
+        );
+        std::fs::write(dir.path().join(".zmetadata"), json).unwrap();
+        let location = StoreLocation::Local(dir.path().to_path_buf());
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let meta = fetch_store_meta(&location, &runtime).unwrap();
+        assert_eq!(meta.arrays.len(), 1);
+        assert_eq!(meta.arrays[0].name, "data");
+    }
+
+    // --- auth_guidance ---
+
+    #[test]
+    fn auth_guidance_s3() {
+        let guidance = auth_guidance("s3://bucket/path");
+        assert!(guidance.contains("AWS_ACCESS_KEY_ID"));
+        assert!(guidance.contains("AWS_PROFILE"));
+    }
+
+    #[test]
+    fn auth_guidance_gcs() {
+        let guidance = auth_guidance("gs://bucket/path");
+        assert!(guidance.contains("GOOGLE_APPLICATION_CREDENTIALS"));
+    }
+
+    #[test]
+    fn auth_guidance_azure() {
+        let guidance = auth_guidance("az://container/path");
+        assert!(guidance.contains("AZURE_STORAGE_ACCOUNT_NAME"));
+    }
+
+    #[test]
+    fn auth_guidance_azure_https() {
+        let guidance = auth_guidance("https://account.blob.core.windows.net/container/path");
+        assert!(guidance.contains("AZURE_STORAGE_ACCOUNT_NAME"));
+    }
+
+    #[test]
+    fn auth_guidance_unknown() {
+        let guidance = auth_guidance("https://example.com/data");
+        assert!(guidance.contains("credentials"));
     }
 }

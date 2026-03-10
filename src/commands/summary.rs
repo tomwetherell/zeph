@@ -6,30 +6,17 @@ use crossterm::style::{Print, ResetColor, SetForegroundColor};
 
 use super::{CommandResult, CommandAction, Ctx};
 use crate::ui::style;
-use zeph::zarr::metadata::{self, ArrayMeta, StoreMeta};
+use zeph::zarr::metadata::{ArrayMeta, StoreMeta};
 use zeph::zarr::store::StoreLocation;
 
 pub fn run(ctx: &Ctx) -> CommandResult {
     let mut out = io::stdout();
 
-    match metadata::parse_store(&ctx.store, &ctx.runtime) {
-        Ok(store) => {
-            let has_dims = store.arrays.iter().any(|a| !a.dims.is_empty());
-            if has_dims {
-                render_xarray_style(&mut out, &ctx.store, &store);
-            } else {
-                render_flat(&mut out, &ctx.store, &store);
-            }
-        }
-        Err(e) => {
-            let _ = crossterm::execute!(
-                out,
-                Print("\n"),
-                SetForegroundColor(style::DIM),
-                Print(format!("  Error: {e:?}\n\n")),
-                ResetColor,
-            );
-        }
+    let has_dims = ctx.meta.arrays.iter().any(|a| !a.dims.is_empty());
+    if has_dims {
+        render_xarray_style(&mut out, &ctx.store, &ctx.meta);
+    } else {
+        render_flat(&mut out, &ctx.store, &ctx.meta);
     }
 
     CommandResult {
