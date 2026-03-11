@@ -37,19 +37,50 @@ impl Spinner {
             let mut idx = 0usize;
             loop {
                 let frame = FRAMES[idx % FRAMES.len()];
+                let prefix = format!("  {frame} {label}");
+                let suffix = detail.as_deref().map(|d| format!(" ({d})"));
+
+                // Use char count (not byte len) for display width since
+                // the frame characters are multi-byte but single-column.
+                let prefix_cols = prefix.chars().count();
+                let suffix_cols = suffix.as_ref().map_or(0, |s| s.chars().count());
+
+                // Truncate to terminal width to prevent line wrapping, which
+                // breaks the \r-based animation (CR only returns to the start
+                // of the last *physical* line).
+                let width = crossterm::terminal::size().map(|(w, _)| w as usize).unwrap_or(80);
+                let truncated_suffix = if prefix_cols + suffix_cols > width {
+                    suffix.map(|s| {
+                        let avail = width.saturating_sub(prefix_cols).saturating_sub(1);
+                        if avail > 4 {
+                            // Keep " (" + truncated content + "…)"
+                            let inner: String = s.chars().skip(2).collect(); // skip " ("
+                            let keep = avail.saturating_sub(3); // room for " (" + "…)"
+                            let truncated: String = inner.chars().take(keep).collect();
+                            format!(" ({truncated}…)")
+                        } else {
+                            String::new()
+                        }
+                    })
+                } else {
+                    suffix
+                };
+
                 let _ = crossterm::execute!(
                     out,
                     Print("\r"),
                     Clear(ClearType::CurrentLine),
                     SetForegroundColor(style::HEADING),
-                    Print(format!("  {frame} {label}")),
+                    Print(&prefix),
                 );
-                if let Some(ref d) = detail {
-                    let _ = crossterm::execute!(
-                        out,
-                        SetForegroundColor(style::DIM_DARK),
-                        Print(format!(" ({d})")),
-                    );
+                if let Some(ref s) = truncated_suffix {
+                    if !s.is_empty() {
+                        let _ = crossterm::execute!(
+                            out,
+                            SetForegroundColor(style::DIM_DARK),
+                            Print(s),
+                        );
+                    }
                 }
                 let _ = crossterm::execute!(out, ResetColor);
                 let _ = out.flush();
