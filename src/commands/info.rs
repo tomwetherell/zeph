@@ -82,10 +82,19 @@ pub fn run(ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
         );
     }
 
-    let _ = crossterm::execute!(out, Print("\n"));
+    // Compressor
+    let _ = crossterm::execute!(
+        out,
+        SetForegroundColor(ctx.palette.heading),
+        Print(format!("  {:<label_width$}", "Compressor:")),
+        ResetColor,
+        Print(format!("{}\n", format_compressor(&array.compressor))),
+    );
 
     // Chunks
     if !array.chunks.is_empty() {
+        let _ = crossterm::execute!(out, Print("\n"));
+
         let chunk_tuple: Vec<String> = array.chunks.iter().map(|c| c.to_string()).collect();
         let _ = crossterm::execute!(
             out,
@@ -124,16 +133,18 @@ pub fn run(ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
                 chunk_label.join(", "),
             )),
         );
-    }
 
-    // Compressor
-    let _ = crossterm::execute!(
-        out,
-        SetForegroundColor(ctx.palette.heading),
-        Print(format!("  {:<label_width$}", "Compressor:")),
-        ResetColor,
-        Print(format!("{}\n", format_compressor(&array.compressor))),
-    );
+        let chunk_values: usize = array.chunks.iter().product();
+        let chunk_bytes = (chunk_values * byte_size) as u64;
+        let _ = crossterm::execute!(
+            out,
+            Print(format!(
+                "  {:<label_width$}{} per chunk\n",
+                "",
+                format_bytes(chunk_bytes),
+            )),
+        );
+    }
 
     // Attributes
     let _ = crossterm::execute!(out, Print("\n"));
