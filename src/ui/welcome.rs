@@ -2,11 +2,11 @@ use std::io;
 
 use crossterm::style::{Attribute, Print, ResetColor, SetAttribute, SetForegroundColor};
 
-use super::style;
+use super::style::Palette;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub fn render(store_path: &str) -> anyhow::Result<()> {
+pub fn render(store_path: &str, palette: &Palette) -> anyhow::Result<()> {
     let mut out = io::stdout();
 
     let display_path = shorten_home(store_path);
@@ -15,11 +15,11 @@ pub fn render(store_path: &str) -> anyhow::Result<()> {
     crossterm::execute!(
         out,
         Print("\n"),
-        SetForegroundColor(style::TITLE),
+        SetForegroundColor(palette.title),
         SetAttribute(Attribute::Bold),
         Print("  Zeph "),
         SetAttribute(Attribute::Reset),
-        SetForegroundColor(style::DIM),
+        SetForegroundColor(palette.dim),
         Print(format!("v{VERSION}")),
         ResetColor,
         Print("\n"),
@@ -28,7 +28,7 @@ pub fn render(store_path: &str) -> anyhow::Result<()> {
     // Store path in dim
     crossterm::execute!(
         out,
-        SetForegroundColor(style::DIM),
+        SetForegroundColor(palette.dim),
         Print(format!("  {display_path}")),
         ResetColor,
         Print("\n\n"),

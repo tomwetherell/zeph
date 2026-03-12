@@ -6,7 +6,7 @@ use crossterm::style::{Print, ResetColor, SetForegroundColor};
 use crossterm::terminal::{self, Clear, ClearType, ScrollUp};
 
 use crate::commands::Command;
-use crate::ui::style;
+use crate::ui::style::Palette;
 
 pub enum Result {
     Selected,
@@ -14,7 +14,7 @@ pub enum Result {
     Submitted,
 }
 
-pub fn run(buffer: &mut String, commands: &[Command]) -> anyhow::Result<Result> {
+pub fn run(buffer: &mut String, commands: &[Command], palette: &Palette) -> anyhow::Result<Result> {
     let mut out = io::stdout();
     let mut selected: usize = 0;
     let mut prev_count: usize = 0;
@@ -46,7 +46,7 @@ pub fn run(buffer: &mut String, commands: &[Command]) -> anyhow::Result<Result> 
             })
             .collect();
 
-        draw_menu(&mut out, &filtered, selected, prev_count)?;
+        draw_menu(&mut out, &filtered, selected, prev_count, palette)?;
         prev_count = filtered.len();
 
         if let Event::Key(key) = event::read()? {
@@ -140,7 +140,7 @@ pub fn run(buffer: &mut String, commands: &[Command]) -> anyhow::Result<Result> 
 /// Draw the menu, overwriting any previous content in place.
 /// Clears each line before writing to handle shrinking content,
 /// and clears leftover lines when the item count decreases.
-fn draw_menu(out: &mut impl Write, items: &[(&Command, Option<&str>)], selected: usize, prev_count: usize) -> anyhow::Result<()> {
+fn draw_menu(out: &mut impl Write, items: &[(&Command, Option<&str>)], selected: usize, prev_count: usize, palette: &Palette) -> anyhow::Result<()> {
     crossterm::queue!(out, cursor::SavePosition)?;
 
     // Skip past the bottom divider line
@@ -163,14 +163,14 @@ fn draw_menu(out: &mut impl Write, items: &[(&Command, Option<&str>)], selected:
             crossterm::queue!(
                 out,
                 Print("  "),
-                SetForegroundColor(style::HEADING),
+                SetForegroundColor(palette.heading),
                 Print(&display_name),
                 ResetColor,
             )?;
             write!(out, "{}", " ".repeat(name_pad))?;
             crossterm::queue!(
                 out,
-                SetForegroundColor(style::HEADING),
+                SetForegroundColor(palette.heading),
                 Print(cmd.description),
                 ResetColor,
             )?;
@@ -179,7 +179,7 @@ fn draw_menu(out: &mut impl Write, items: &[(&Command, Option<&str>)], selected:
             crossterm::queue!(
                 out,
                 Print("  "),
-                SetForegroundColor(style::DIM),
+                SetForegroundColor(palette.dim),
                 Print(&display_name),
             )?;
             write!(out, "{}", " ".repeat(name_pad))?;

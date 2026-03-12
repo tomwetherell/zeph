@@ -7,7 +7,7 @@ use std::time::Duration;
 use crossterm::style::{Print, ResetColor, SetForegroundColor};
 use crossterm::terminal::{Clear, ClearType};
 
-use super::style;
+use super::style::Palette;
 
 const FRAMES: &[char] = &['·', '✻', '✶', '✳', '✢'];
 const FRAME_INTERVAL: Duration = Duration::from_millis(120);
@@ -26,11 +26,13 @@ impl Spinner {
     ///
     /// The spinner prints on its own line and cycles through the frame
     /// characters at the front of the line.
-    pub fn start(label: &str, detail: Option<&str>) -> Self {
+    pub fn start(label: &str, detail: Option<&str>, palette: &Palette) -> Self {
         let stop_flag = Arc::new(AtomicBool::new(false));
         let flag = stop_flag.clone();
         let label = label.to_string();
         let detail = detail.map(|s| s.to_string());
+        let heading = palette.heading;
+        let dim_dark = palette.dim_dark;
 
         let handle = thread::spawn(move || {
             let mut out = io::stdout();
@@ -70,14 +72,14 @@ impl Spinner {
                     out,
                     Print("\r"),
                     Clear(ClearType::CurrentLine),
-                    SetForegroundColor(style::HEADING),
+                    SetForegroundColor(heading),
                     Print(&prefix),
                 );
                 if let Some(ref s) = truncated_suffix {
                     if !s.is_empty() {
                         let _ = crossterm::execute!(
                             out,
-                            SetForegroundColor(style::DIM_DARK),
+                            SetForegroundColor(dim_dark),
                             Print(s),
                         );
                     }
@@ -106,7 +108,7 @@ impl Spinner {
 
     /// Stop the spinner, freeze the line, and print subtitle messages
     /// underneath using the `⎿` prefix style.
-    pub fn stop_with_message(mut self, subtitles: &[&str]) {
+    pub fn stop_with_message(mut self, subtitles: &[&str], palette: &Palette) {
         self.stop_flag.store(true, Ordering::Relaxed);
         if let Some(h) = self.handle.take() {
             let _ = h.join();
@@ -119,7 +121,7 @@ impl Spinner {
         for msg in subtitles {
             let _ = crossterm::execute!(
                 out,
-                SetForegroundColor(style::DIM),
+                SetForegroundColor(palette.dim),
                 Print(format!("  ⎿  {msg}\n")),
                 ResetColor,
             );

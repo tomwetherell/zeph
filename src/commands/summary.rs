@@ -5,7 +5,7 @@ use std::path::Path;
 use crossterm::style::{Print, ResetColor, SetForegroundColor};
 
 use super::{CommandResult, CommandAction, Ctx};
-use crate::ui::style;
+use crate::ui::style::Palette;
 use zeph::zarr::metadata::{ArrayMeta, StoreMeta};
 use zeph::zarr::store::StoreLocation;
 
@@ -14,9 +14,9 @@ pub fn run(ctx: &Ctx) -> CommandResult {
 
     let has_dims = ctx.meta.arrays.iter().any(|a| !a.dims.is_empty());
     if has_dims {
-        render_xarray_style(&mut out, &ctx.store, &ctx.meta);
+        render_xarray_style(&mut out, &ctx.store, &ctx.meta, &ctx.palette);
     } else {
-        render_flat(&mut out, &ctx.store, &ctx.meta);
+        render_flat(&mut out, &ctx.store, &ctx.meta, &ctx.palette);
     }
 
     CommandResult {
@@ -25,7 +25,7 @@ pub fn run(ctx: &Ctx) -> CommandResult {
     }
 }
 
-fn render_xarray_style(out: &mut impl Write, location: &StoreLocation, store: &StoreMeta) {
+fn render_xarray_style(out: &mut impl Write, location: &StoreLocation, store: &StoreMeta, palette: &Palette) {
     // Build dimension sizes from all arrays
     let mut dim_sizes: BTreeMap<String, usize> = BTreeMap::new();
     for arr in &store.arrays {
@@ -85,7 +85,7 @@ fn render_xarray_style(out: &mut impl Write, location: &StoreLocation, store: &S
     let _ = crossterm::execute!(out, Print("\n"));
     let _ = crossterm::execute!(
         out,
-        SetForegroundColor(style::HEADING),
+        SetForegroundColor(palette.heading),
         Print("  Store: "),
         ResetColor,
         Print(format!(
@@ -98,7 +98,7 @@ fn render_xarray_style(out: &mut impl Write, location: &StoreLocation, store: &S
     let _ = crossterm::execute!(out, Print("\n"));
     let _ = crossterm::execute!(
         out,
-        SetForegroundColor(style::HEADING),
+        SetForegroundColor(palette.heading),
         Print("  Dimensions:  "),
         ResetColor,
     );
@@ -111,36 +111,36 @@ fn render_xarray_style(out: &mut impl Write, location: &StoreLocation, store: &S
     // Coordinates
     let _ = crossterm::execute!(
         out,
-        SetForegroundColor(style::HEADING),
+        SetForegroundColor(palette.heading),
         Print("  Coordinates:\n"),
         ResetColor,
     );
     for arr in &coords {
-        print_array_line(out, arr, max_name, max_dims_str, max_dtype);
+        print_array_line(out, arr, max_name, max_dims_str, max_dtype, palette);
     }
 
     // Data variables
     let _ = crossterm::execute!(
         out,
-        SetForegroundColor(style::HEADING),
+        SetForegroundColor(palette.heading),
         Print("  Data variables:\n"),
         ResetColor,
     );
     for arr in &data_vars {
-        print_array_line(out, arr, max_name, max_dims_str, max_dtype);
+        print_array_line(out, arr, max_name, max_dims_str, max_dtype, palette);
     }
 
     // Attributes
     let _ = crossterm::execute!(
         out,
-        SetForegroundColor(style::HEADING),
+        SetForegroundColor(palette.heading),
         Print("  Attributes:\n"),
         ResetColor,
     );
     if store.root_attrs.is_empty() {
         let _ = crossterm::execute!(
             out,
-            SetForegroundColor(style::DIM),
+            SetForegroundColor(palette.dim),
             Print("      (none)\n"),
             ResetColor,
         );
@@ -153,7 +153,7 @@ fn render_xarray_style(out: &mut impl Write, location: &StoreLocation, store: &S
             let _ = crossterm::execute!(
                 out,
                 Print(format!("      {k}: ")),
-                SetForegroundColor(style::DIM),
+                SetForegroundColor(palette.dim),
                 Print(format!("{val_str}\n")),
                 ResetColor,
             );
@@ -162,13 +162,13 @@ fn render_xarray_style(out: &mut impl Write, location: &StoreLocation, store: &S
     let _ = writeln!(out);
 }
 
-fn render_flat(out: &mut impl Write, location: &StoreLocation, store: &StoreMeta) {
+fn render_flat(out: &mut impl Write, location: &StoreLocation, store: &StoreMeta, palette: &Palette) {
     let display_path = location.display_path();
     let size_str = store_size_str(location);
     let _ = crossterm::execute!(out, Print("\n"));
     let _ = crossterm::execute!(
         out,
-        SetForegroundColor(style::HEADING),
+        SetForegroundColor(palette.heading),
         Print("  Store: "),
         ResetColor,
         Print(format!(
@@ -180,7 +180,7 @@ fn render_flat(out: &mut impl Write, location: &StoreLocation, store: &StoreMeta
     let max_name = store.arrays.iter().map(|a| a.name.len()).max().unwrap_or(0);
     let _ = crossterm::execute!(
         out,
-        SetForegroundColor(style::HEADING),
+        SetForegroundColor(palette.heading),
         Print("  Arrays:\n"),
         ResetColor,
     );
@@ -191,7 +191,7 @@ fn render_flat(out: &mut impl Write, location: &StoreLocation, store: &StoreMeta
         let _ = crossterm::execute!(
             out,
             Print(format!("      {}{}", arr.name, " ".repeat(pad))),
-            SetForegroundColor(style::DIM),
+            SetForegroundColor(palette.dim),
             Print(format!("{dtype}  {shape_str}\n")),
             ResetColor,
         );
@@ -199,7 +199,7 @@ fn render_flat(out: &mut impl Write, location: &StoreLocation, store: &StoreMeta
     let _ = writeln!(out);
 }
 
-fn print_array_line(out: &mut impl Write, arr: &ArrayMeta, max_name: usize, max_dims: usize, max_dtype: usize) {
+fn print_array_line(out: &mut impl Write, arr: &ArrayMeta, max_name: usize, max_dims: usize, max_dtype: usize, palette: &Palette) {
     let dims_str = format_dims_parens(arr);
     let dtype = friendly_dtype(&arr.dtype);
     let shape_str = format_shape(&arr.shape);
@@ -209,7 +209,7 @@ fn print_array_line(out: &mut impl Write, arr: &ArrayMeta, max_name: usize, max_
     let _ = crossterm::execute!(
         out,
         Print(format!("      {}{}", arr.name, " ".repeat(name_pad))),
-        SetForegroundColor(style::DIM),
+        SetForegroundColor(palette.dim),
         Print(format!(
             "{}{}{dtype}{}{shape_str}\n",
             dims_str,

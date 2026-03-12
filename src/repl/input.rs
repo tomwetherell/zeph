@@ -6,7 +6,7 @@ use crossterm::style::{Print, ResetColor, SetBackgroundColor, SetForegroundColor
 use crossterm::terminal::{self, Clear, ClearType};
 
 use crate::commands::Command;
-use crate::ui::style;
+use crate::ui::style::Palette;
 
 use super::autocomplete;
 
@@ -31,12 +31,12 @@ impl Drop for RawModeGuard {
     }
 }
 
-pub fn print_divider(out: &mut impl Write) -> anyhow::Result<()> {
+pub fn print_divider(out: &mut impl Write, palette: &Palette) -> anyhow::Result<()> {
     let (term_width, _) = terminal::size().unwrap_or((80, 24));
     let line = "─".repeat(term_width as usize);
     crossterm::execute!(
         out,
-        SetForegroundColor(style::DIM),
+        SetForegroundColor(palette.dim),
         Print(&line),
         Print("\n"),
         ResetColor,
@@ -48,7 +48,7 @@ pub fn print_divider(out: &mut impl Write) -> anyhow::Result<()> {
 /// (top divider, input line, bottom divider) to show the command
 /// on a gray background with no dividers.
 /// Cursor must be on the input line when called.
-fn confirm_prompt(out: &mut impl Write, buffer: &str) -> anyhow::Result<()> {
+fn confirm_prompt(out: &mut impl Write, buffer: &str, palette: &Palette) -> anyhow::Result<()> {
     let (term_width, _) = terminal::size().unwrap_or((80, 24));
 
     // Move up to top divider and clear it
@@ -61,10 +61,10 @@ fn confirm_prompt(out: &mut impl Write, buffer: &str) -> anyhow::Result<()> {
     let pad = (term_width as usize).saturating_sub(arrow_pad + cmd_text.chars().count());
     crossterm::execute!(
         out,
-        SetBackgroundColor(style::INPUT_BG),
-        SetForegroundColor(style::DIM),
+        SetBackgroundColor(palette.input_bg),
+        SetForegroundColor(palette.dim),
         Print("❯"),
-        SetForegroundColor(crossterm::style::Color::Black),
+        SetForegroundColor(palette.input_fg),
         Print(&cmd_text),
         Print(" ".repeat(pad)),
         ResetColor,
@@ -76,23 +76,23 @@ fn confirm_prompt(out: &mut impl Write, buffer: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn read_input(commands: &[Command]) -> anyhow::Result<Input> {
+pub fn read_input(commands: &[Command], palette: &Palette) -> anyhow::Result<Input> {
     let mut out = io::stdout();
 
     // Print divider above prompt
-    print_divider(&mut out)?;
+    print_divider(&mut out, palette)?;
 
     // Print prompt
     crossterm::execute!(
         out,
-        SetForegroundColor(crossterm::style::Color::Black),
+        SetForegroundColor(palette.input_fg),
         Print("❯ "),
         ResetColor,
     )?;
 
     // Print bottom divider, then move cursor back up to prompt line
     crossterm::execute!(out, Print("\n"))?;
-    print_divider(&mut out)?;
+    print_divider(&mut out, palette)?;
     crossterm::execute!(
         out,
         cursor::MoveUp(2),
@@ -116,7 +116,7 @@ pub fn read_input(commands: &[Command]) -> anyhow::Result<Input> {
                         crossterm::execute!(out, cursor::MoveDown(1), Print("\r\n"))?;
                         return Ok(Input::Empty);
                     } else {
-                        confirm_prompt(&mut out, &buffer)?;
+                        confirm_prompt(&mut out, &buffer, palette)?;
                         return Ok(Input::Command(buffer));
                     }
                 }
@@ -136,9 +136,9 @@ pub fn read_input(commands: &[Command]) -> anyhow::Result<Input> {
                     out.flush()?;
 
                     // Enter autocomplete mode
-                    match autocomplete::run(&mut buffer, commands)? {
+                    match autocomplete::run(&mut buffer, commands, palette)? {
                         autocomplete::Result::Selected => {
-                            confirm_prompt(&mut out, &buffer)?;
+                            confirm_prompt(&mut out, &buffer, palette)?;
                             return Ok(Input::Command(buffer));
                         }
                         autocomplete::Result::Dismissed => {
@@ -155,7 +155,7 @@ pub fn read_input(commands: &[Command]) -> anyhow::Result<Input> {
                             // Continue reading input
                         }
                         autocomplete::Result::Submitted => {
-                            confirm_prompt(&mut out, &buffer)?;
+                            confirm_prompt(&mut out, &buffer, palette)?;
                             return Ok(Input::Command(buffer));
                         }
                     }
