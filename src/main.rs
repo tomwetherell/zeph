@@ -31,7 +31,7 @@ fn main() -> anyhow::Result<()> {
             .into_owned(),
     };
 
-    let palette = Palette::new(style::detect_color_support());
+    let palette = Palette::new(style::detect_color_support(), style::detect_theme());
 
     let store = StoreLocation::parse(&input)?;
     let runtime = tokio::runtime::Runtime::new()?;
