@@ -28,9 +28,7 @@ pub fn run(ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
         SetForegroundColor(ctx.palette.heading),
         Print(&array.name),
         ResetColor,
-        SetForegroundColor(ctx.palette.dim),
         Print(&dims_str),
-        ResetColor,
         Print("\n"),
     );
 
@@ -172,10 +170,10 @@ pub fn run(ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
             let pad = max_key.saturating_sub(k.len()) + 2;
             let _ = crossterm::execute!(
                 out,
-                Print(format!("      {k}:{}", " ".repeat(pad))),
                 SetForegroundColor(ctx.palette.dim),
-                Print(format!("{val_str}\n")),
+                Print(format!("      {k}:{}", " ".repeat(pad))),
                 ResetColor,
+                Print(format!("{val_str}\n")),
             );
         }
     }
