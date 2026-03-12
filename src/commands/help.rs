@@ -3,9 +3,8 @@ use std::io::{self, Write};
 use crossterm::style::{Print, ResetColor, SetForegroundColor};
 
 use super::{all_commands, CommandAction, CommandResult};
-use crate::ui::style;
 
-pub fn run(_ctx: &super::Ctx) -> CommandResult {
+pub fn run(ctx: &super::Ctx) -> CommandResult {
     let mut out = io::stdout();
     let _ = crossterm::execute!(out, Print("\n"));
 
@@ -13,7 +12,7 @@ pub fn run(_ctx: &super::Ctx) -> CommandResult {
         let _ = crossterm::execute!(
             out,
             Print("  "),
-            SetForegroundColor(style::HEADING),
+            SetForegroundColor(ctx.palette.heading),
             Print(cmd.name),
             ResetColor,
         );
@@ -21,7 +20,7 @@ pub fn run(_ctx: &super::Ctx) -> CommandResult {
         let _ = write!(out, "{}", " ".repeat(pad));
         let _ = crossterm::execute!(
             out,
-            SetForegroundColor(style::DIM),
+            SetForegroundColor(ctx.palette.dim),
             Print(cmd.description),
             ResetColor,
             Print("\n"),

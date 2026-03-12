@@ -10,6 +10,7 @@ use crossterm::style::{Print, ResetColor, SetForegroundColor};
 
 use commands::Ctx;
 use ui::spinner::Spinner;
+use ui::style::{self, Palette};
 use zeph::zarr::metadata::{self, FetchError};
 use zeph::zarr::store::StoreLocation;
 
@@ -30,6 +31,8 @@ fn main() -> anyhow::Result<()> {
             .into_owned(),
     };
 
+    let palette = Palette::new(style::detect_color_support());
+
     let store = StoreLocation::parse(&input)?;
     let runtime = tokio::runtime::Runtime::new()?;
 
@@ -39,6 +42,7 @@ fn main() -> anyhow::Result<()> {
         Some(Spinner::start(
             "Connecting...",
             Some(&store.display_path()),
+            &palette,
         ))
     } else {
         None
@@ -47,19 +51,19 @@ fn main() -> anyhow::Result<()> {
     let meta = match metadata::fetch_store_meta(&store, &runtime) {
         Ok(meta) => {
             if let Some(sp) = spinner {
-                sp.stop_with_message(&["Fetched .zmetadata"]);
+                sp.stop_with_message(&["Fetched .zmetadata"], &palette);
             }
             meta
         }
         Err(e) => {
             if let Some(sp) = spinner {
-                sp.stop_with_message(&["Error fetching .zmetadata"]);
+                sp.stop_with_message(&["Error fetching .zmetadata"], &palette);
             }
             let mut out = io::stderr();
             let _ = crossterm::execute!(
                 out,
                 Print("\n"),
-                SetForegroundColor(ui::style::HEADING),
+                SetForegroundColor(palette.heading),
                 Print("  Error: "),
                 ResetColor,
             );
@@ -81,9 +85,9 @@ fn main() -> anyhow::Result<()> {
         }
     };
 
-    ui::welcome::render(&store.display_path())?;
+    ui::welcome::render(&store.display_path(), &palette)?;
 
-    let ctx = Ctx { store, meta };
+    let ctx = Ctx { store, meta, palette };
     repl::run(&ctx)?;
 
     Ok(())

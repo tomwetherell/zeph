@@ -5,10 +5,9 @@ use serde_json::Value;
 
 use super::{CommandAction, CommandResult, Ctx};
 use super::summary::{format_bytes, friendly_dtype};
-use crate::ui::style;
 use zeph::zarr::metadata::ArrayMeta;
 
-pub fn run(_ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
+pub fn run(ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
     let mut out = io::stdout();
 
     // Header: name (dim1: size1, dim2: size2, ...)
@@ -26,10 +25,10 @@ pub fn run(_ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
     let _ = crossterm::execute!(
         out,
         Print("  "),
-        SetForegroundColor(style::HEADING),
+        SetForegroundColor(ctx.palette.heading),
         Print(&array.name),
         ResetColor,
-        SetForegroundColor(style::DIM),
+        SetForegroundColor(ctx.palette.dim),
         Print(&dims_str),
         ResetColor,
         Print("\n"),
@@ -44,7 +43,7 @@ pub fn run(_ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
     let label_width = 13;
     let _ = crossterm::execute!(
         out,
-        SetForegroundColor(style::HEADING),
+        SetForegroundColor(ctx.palette.heading),
         Print(format!("  {:<label_width$}", "Size:")),
         ResetColor,
         Print(format!(
@@ -57,7 +56,7 @@ pub fn run(_ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
     // Dtype
     let _ = crossterm::execute!(
         out,
-        SetForegroundColor(style::HEADING),
+        SetForegroundColor(ctx.palette.heading),
         Print(format!("  {:<label_width$}", "Dtype:")),
         ResetColor,
         Print(format!("{}\n", friendly_dtype(&array.dtype))),
@@ -66,7 +65,7 @@ pub fn run(_ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
     // Fill value
     let _ = crossterm::execute!(
         out,
-        SetForegroundColor(style::HEADING),
+        SetForegroundColor(ctx.palette.heading),
         Print(format!("  {:<label_width$}", "Fill value:")),
         ResetColor,
         Print(format!("{}\n", format_fill_value(&array.fill_value))),
@@ -76,7 +75,7 @@ pub fn run(_ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
     if let Some(ref order) = array.order {
         let _ = crossterm::execute!(
             out,
-            SetForegroundColor(style::HEADING),
+            SetForegroundColor(ctx.palette.heading),
             Print(format!("  {:<label_width$}", "Order:")),
             ResetColor,
             Print(format!("{order}\n")),
@@ -90,7 +89,7 @@ pub fn run(_ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
         let chunk_tuple: Vec<String> = array.chunks.iter().map(|c| c.to_string()).collect();
         let _ = crossterm::execute!(
             out,
-            SetForegroundColor(style::HEADING),
+            SetForegroundColor(ctx.palette.heading),
             Print(format!("  {:<label_width$}", "Chunks:")),
             ResetColor,
             Print(format!("({})\n", chunk_tuple.join(", "))),
@@ -130,7 +129,7 @@ pub fn run(_ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
     // Compressor
     let _ = crossterm::execute!(
         out,
-        SetForegroundColor(style::HEADING),
+        SetForegroundColor(ctx.palette.heading),
         Print(format!("  {:<label_width$}", "Compressor:")),
         ResetColor,
         Print(format!("{}\n", format_compressor(&array.compressor))),
@@ -140,7 +139,7 @@ pub fn run(_ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
     let _ = crossterm::execute!(out, Print("\n"));
     let _ = crossterm::execute!(
         out,
-        SetForegroundColor(style::HEADING),
+        SetForegroundColor(ctx.palette.heading),
         Print("  Attributes:\n"),
         ResetColor,
     );
@@ -148,7 +147,7 @@ pub fn run(_ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
     if array.attrs.is_empty() {
         let _ = crossterm::execute!(
             out,
-            SetForegroundColor(style::DIM),
+            SetForegroundColor(ctx.palette.dim),
             Print("      (none)\n"),
             ResetColor,
         );
@@ -163,7 +162,7 @@ pub fn run(_ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
             let _ = crossterm::execute!(
                 out,
                 Print(format!("      {k}:{}", " ".repeat(pad))),
-                SetForegroundColor(style::DIM),
+                SetForegroundColor(ctx.palette.dim),
                 Print(format!("{val_str}\n")),
                 ResetColor,
             );

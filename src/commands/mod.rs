@@ -2,12 +2,14 @@ mod help;
 mod info;
 pub(crate) mod summary;
 
+use crate::ui::style::Palette;
 use zeph::zarr::metadata::{ArrayMeta, StoreMeta};
 use zeph::zarr::store::StoreLocation;
 
 pub struct Ctx {
     pub store: StoreLocation,
     pub meta: StoreMeta,
+    pub palette: Palette,
 }
 
 pub enum Handler {

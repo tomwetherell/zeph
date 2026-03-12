@@ -6,7 +6,7 @@ use crossterm::style::{Print, ResetColor, SetForegroundColor};
 use crossterm::terminal::{self, Clear, ClearType, ScrollUp};
 
 use crate::commands::summary::friendly_dtype;
-use crate::ui::style;
+use crate::ui::style::Palette;
 use zeph::zarr::metadata::ArrayMeta;
 
 const WINDOW_SIZE: usize = 10;
@@ -27,7 +27,7 @@ impl Drop for RawModeGuard {
 }
 
 /// Run the variable picker. Returns `Some(index)` into the arrays list, or `None` if cancelled.
-pub fn run(arrays: &[ArrayMeta]) -> anyhow::Result<Option<usize>> {
+pub fn run(arrays: &[ArrayMeta], palette: &Palette) -> anyhow::Result<Option<usize>> {
     let mut out = io::stdout();
     let mut selected: usize = 0;
     let mut filter = String::new();
@@ -71,7 +71,7 @@ pub fn run(arrays: &[ArrayMeta]) -> anyhow::Result<Option<usize>> {
 
         viewport_start = compute_viewport(selected, viewport_start, filtered.len(), WINDOW_SIZE);
 
-        prev_lines = draw_picker(&mut out, &filtered, selected, viewport_start, WINDOW_SIZE, prev_lines)?;
+        prev_lines = draw_picker(&mut out, &filtered, selected, viewport_start, WINDOW_SIZE, prev_lines, palette)?;
 
         if let Event::Key(key) = event::read()? {
             match (key.code, key.modifiers) {
@@ -160,6 +160,7 @@ fn draw_picker(
     viewport_start: usize,
     window_size: usize,
     prev_lines: usize,
+    palette: &Palette,
 ) -> anyhow::Result<usize> {
     crossterm::queue!(out, cursor::SavePosition)?;
 
@@ -180,7 +181,7 @@ fn draw_picker(
                 Print("\n\r"),
                 Clear(ClearType::CurrentLine),
                 Print("    "),
-                SetForegroundColor(style::DIM),
+                SetForegroundColor(palette.dim),
                 Print(format!("↑ {} more", viewport_start)),
                 ResetColor,
             )?;
@@ -197,7 +198,7 @@ fn draw_picker(
             if i == selected {
                 crossterm::queue!(
                     out,
-                    SetForegroundColor(style::HEADING),
+                    SetForegroundColor(palette.heading),
                     Print("  ❯ "),
                     Print(&text),
                     ResetColor,
@@ -206,7 +207,7 @@ fn draw_picker(
                 crossterm::queue!(
                     out,
                     Print("    "),
-                    SetForegroundColor(style::DIM),
+                    SetForegroundColor(palette.dim),
                     Print(&text),
                     ResetColor,
                 )?;
@@ -221,7 +222,7 @@ fn draw_picker(
                 Print("\n\r"),
                 Clear(ClearType::CurrentLine),
                 Print("    "),
-                SetForegroundColor(style::DIM),
+                SetForegroundColor(palette.dim),
                 Print(format!("↓ {} more", remaining)),
                 ResetColor,
             )?;
