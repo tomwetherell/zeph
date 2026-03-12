@@ -1,4 +1,5 @@
 mod autocomplete;
+mod history;
 mod input;
 mod picker;
 
@@ -10,9 +11,11 @@ use crate::commands::{self, CommandAction, Ctx, Handler};
 
 pub fn run(ctx: &Ctx) -> anyhow::Result<()> {
     let commands = commands::all_commands();
+    let mut history = history::History::new();
     loop {
-        match input::read_input(&commands, &ctx.palette)? {
+        match input::read_input(&commands, &ctx.palette, &mut history)? {
             input::Input::Command(name) => {
+                history.push(name.clone());
                 let cmd = commands.iter().find(|c| {
                     c.name == name || c.aliases.contains(&name.as_str())
                 });

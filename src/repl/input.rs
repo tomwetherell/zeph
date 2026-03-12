@@ -9,6 +9,7 @@ use crate::commands::Command;
 use crate::ui::style::Palette;
 
 use super::autocomplete;
+use super::history::History;
 
 pub enum Input {
     Command(String),
@@ -76,7 +77,22 @@ fn confirm_prompt(out: &mut impl Write, buffer: &str, palette: &Palette) -> anyh
     Ok(())
 }
 
-pub fn read_input(commands: &[Command], palette: &Palette) -> anyhow::Result<Input> {
+/// Replace the visible input text and buffer with new content.
+fn replace_buffer(out: &mut impl Write, buffer: &mut String, new: &str) -> anyhow::Result<()> {
+    // Move cursor to start of input (after "❯ ")
+    crossterm::execute!(
+        out,
+        Print("\r"),
+        cursor::MoveRight(2),
+        Clear(ClearType::UntilNewLine),
+        Print(new),
+    )?;
+    buffer.clear();
+    buffer.push_str(new);
+    Ok(())
+}
+
+pub fn read_input(commands: &[Command], palette: &Palette, history: &mut History) -> anyhow::Result<Input> {
     let mut out = io::stdout();
 
     // Print divider above prompt
@@ -108,10 +124,12 @@ pub fn read_input(commands: &[Command], palette: &Palette) -> anyhow::Result<Inp
         if let Event::Key(key) = event::read()? {
             match (key.code, key.modifiers) {
                 (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
+                    history.reset();
                     crossterm::execute!(out, cursor::MoveDown(1), Print("\r\n"))?;
                     return Ok(Input::Quit);
                 }
                 (KeyCode::Enter, _) => {
+                    history.reset();
                     if buffer.is_empty() {
                         crossterm::execute!(out, cursor::MoveDown(1), Print("\r\n"))?;
                         return Ok(Input::Empty);
@@ -158,6 +176,18 @@ pub fn read_input(commands: &[Command], palette: &Palette) -> anyhow::Result<Inp
                             confirm_prompt(&mut out, &buffer, palette)?;
                             return Ok(Input::Command(buffer));
                         }
+                    }
+                }
+                (KeyCode::Up, _) => {
+                    if let Some(entry) = history.up() {
+                        let entry = entry.to_string();
+                        replace_buffer(&mut out, &mut buffer, &entry)?;
+                    }
+                }
+                (KeyCode::Down, _) => {
+                    if let Some(entry) = history.down() {
+                        let entry = entry.to_string();
+                        replace_buffer(&mut out, &mut buffer, &entry)?;
                     }
                 }
                 (KeyCode::Char(c), _) => {
