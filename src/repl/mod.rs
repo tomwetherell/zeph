@@ -59,7 +59,6 @@ pub fn run(ctx: &Ctx) -> anyhow::Result<()> {
                 }
             }
             input::Input::Quit => break,
-            input::Input::Empty => continue,
         }
     }
     Ok(())

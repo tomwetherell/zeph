@@ -14,7 +14,6 @@ use super::history::History;
 pub enum Input {
     Command(String),
     Quit,
-    Empty,
 }
 
 struct RawModeGuard;
@@ -131,8 +130,7 @@ pub fn read_input(commands: &[Command], palette: &Palette, history: &mut History
                 (KeyCode::Enter, _) => {
                     history.reset();
                     if buffer.is_empty() {
-                        crossterm::execute!(out, cursor::MoveDown(1), Print("\r\n"))?;
-                        return Ok(Input::Empty);
+                        continue;
                     } else {
                         confirm_prompt(&mut out, &buffer, palette)?;
                         return Ok(Input::Command(buffer));
