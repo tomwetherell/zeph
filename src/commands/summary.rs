@@ -40,7 +40,7 @@ fn render_xarray_style(out: &mut impl Write, location: &StoreLocation, store: &S
     let coord_set: BTreeSet<String> = store
         .arrays
         .iter()
-        .filter(|a| is_coordinate(a))
+        .filter(|a| a.is_coordinate())
         .map(|a| a.name.clone())
         .collect();
 
@@ -253,10 +253,6 @@ pub(crate) fn friendly_dtype(dtype: &str) -> &str {
     }
 }
 
-fn is_coordinate(arr: &ArrayMeta) -> bool {
-    arr.dims.len() == 1 && arr.dims[0] == arr.name
-}
-
 fn store_size_str(location: &StoreLocation) -> String {
     match location {
         StoreLocation::Local(path) => dir_size_human(path),
@@ -372,25 +368,25 @@ mod tests {
     #[test]
     fn is_coordinate_true() {
         let arr = make_array("time", &["time"], &[365], "<f8");
-        assert!(is_coordinate(&arr));
+        assert!(arr.is_coordinate());
     }
 
     #[test]
     fn is_coordinate_false_no_dims() {
         let arr = make_array("time", &[], &[365], "<f8");
-        assert!(!is_coordinate(&arr));
+        assert!(!arr.is_coordinate());
     }
 
     #[test]
     fn is_coordinate_false_dim_name_mismatch() {
         let arr = make_array("temperature", &["time"], &[365], "<f4");
-        assert!(!is_coordinate(&arr));
+        assert!(!arr.is_coordinate());
     }
 
     #[test]
     fn is_coordinate_false_multiple_dims() {
         let arr = make_array("time", &["time", "lat"], &[365, 180], "<f8");
-        assert!(!is_coordinate(&arr));
+        assert!(!arr.is_coordinate());
     }
 
     // --- format_dims_parens ---

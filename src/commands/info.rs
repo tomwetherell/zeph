@@ -1,10 +1,12 @@
 use std::io::{self, Write};
+use std::time::Duration;
 
 use crossterm::style::{Print, ResetColor, SetForegroundColor};
 use serde_json::Value;
 
 use super::{CommandAction, CommandResult, Ctx};
 use super::summary::{format_bytes, friendly_dtype};
+use zeph::zarr::coord_cache::CoordEntry;
 use zeph::zarr::metadata::ArrayMeta;
 
 pub fn run(ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
@@ -142,6 +144,62 @@ pub fn run(ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
                 format_bytes(chunk_bytes),
             )),
         );
+    }
+
+    // Coordinates — show values for dimensions that have coordinate arrays
+    let coord_entries: Vec<(&ArrayMeta, Option<CoordEntry>)> = array
+        .dims
+        .iter()
+        .filter_map(|dim_name| {
+            ctx.meta
+                .arrays
+                .iter()
+                .find(|a| a.is_coordinate() && a.name == *dim_name)
+        })
+        .map(|coord_arr| {
+            let entry = ctx
+                .coord_cache
+                .get_or_wait(&coord_arr.name, Duration::from_millis(200));
+            (coord_arr, entry)
+        })
+        .collect();
+
+    if !coord_entries.is_empty() {
+        let _ = crossterm::execute!(out, Print("\n"));
+        let _ = crossterm::execute!(
+            out,
+            SetForegroundColor(ctx.palette.heading),
+            Print("  Coordinates:\n"),
+            ResetColor,
+        );
+
+        let max_name = coord_entries.iter().map(|(a, _)| a.name.len()).max().unwrap_or(0);
+        for (coord_arr, entry) in &coord_entries {
+            let name_pad = max_name.saturating_sub(coord_arr.name.len()) + 2;
+            let size = coord_arr.shape.first().copied().unwrap_or(0);
+            let dtype = friendly_dtype(&coord_arr.dtype);
+
+            let values_str = match entry {
+                Some(CoordEntry::Ready(vals)) => vals.format_summary(3, 3),
+                Some(CoordEntry::Pending) => "loading...".to_string(),
+                Some(CoordEntry::Failed(_)) | None => String::new(),
+            };
+
+            let _ = crossterm::execute!(
+                out,
+                Print(format!("    * {}{}", coord_arr.name, " ".repeat(name_pad))),
+                SetForegroundColor(ctx.palette.dim),
+                Print(format!("({size})  {dtype}")),
+                ResetColor,
+            );
+            if !values_str.is_empty() {
+                let _ = crossterm::execute!(
+                    out,
+                    Print(format!("   {values_str}")),
+                );
+            }
+            let _ = crossterm::execute!(out, Print("\n"));
+        }
     }
 
     // Attributes

@@ -13,6 +13,9 @@ serde_json = "1"
 object_store = { version = "0.13", features = ["aws", "gcp", "azure", "http"] }
 tokio = { version = "1", features = ["rt-multi-thread"] }
 url = "2"
+zarrs = { version = "0.23", features = ["async"] }
+zarrs_object_store = "0.6"
+zarrs_storage = "0.4"
 
 [dev-dependencies]
 tempfile = "3"
