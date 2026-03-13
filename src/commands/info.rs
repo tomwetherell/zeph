@@ -177,7 +177,11 @@ pub fn run(ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
         for (coord_arr, entry) in &coord_entries {
             let name_pad = max_name.saturating_sub(coord_arr.name.len()) + 2;
             let size = coord_arr.shape.first().copied().unwrap_or(0);
-            let dtype = friendly_dtype(&coord_arr.dtype);
+
+            let dtype: &str = match entry {
+                Some(CoordEntry::Ready(vals)) if vals.is_datetime() => "datetime64",
+                _ => friendly_dtype(&coord_arr.dtype),
+            };
 
             let values_str = match entry {
                 Some(CoordEntry::Ready(vals)) => vals.format_summary(3, 3),
