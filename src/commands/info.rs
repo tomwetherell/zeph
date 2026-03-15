@@ -173,33 +173,45 @@ pub fn run(ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
             ResetColor,
         );
 
-        let max_name = coord_entries.iter().map(|(a, _)| a.name.len()).max().unwrap_or(0);
-        for (coord_arr, entry) in &coord_entries {
+        // Pre-compute display data for column alignment
+        let rows: Vec<_> = coord_entries
+            .iter()
+            .map(|(coord_arr, entry)| {
+                let size = coord_arr.shape.first().copied().unwrap_or(0);
+                let size_str = format!("({size})");
+                let dtype: &str = match entry {
+                    Some(CoordEntry::Ready(vals)) if vals.is_datetime() => "datetime64",
+                    _ => friendly_dtype(&coord_arr.dtype),
+                };
+                let values_str = match entry {
+                    Some(CoordEntry::Ready(vals)) => vals.format_summary(3, 3),
+                    Some(CoordEntry::Pending) => "loading...".to_string(),
+                    Some(CoordEntry::Failed(_)) | None => String::new(),
+                };
+                (coord_arr, size_str, dtype, values_str)
+            })
+            .collect();
+
+        let max_name = rows.iter().map(|(a, _, _, _)| a.name.len()).max().unwrap_or(0);
+        let max_size = rows.iter().map(|(_, s, _, _)| s.len()).max().unwrap_or(0);
+        let max_dtype = rows.iter().map(|(_, _, d, _)| d.len()).max().unwrap_or(0);
+
+        for (coord_arr, size_str, dtype, values_str) in &rows {
             let name_pad = max_name.saturating_sub(coord_arr.name.len()) + 2;
-            let size = coord_arr.shape.first().copied().unwrap_or(0);
-
-            let dtype: &str = match entry {
-                Some(CoordEntry::Ready(vals)) if vals.is_datetime() => "datetime64",
-                _ => friendly_dtype(&coord_arr.dtype),
-            };
-
-            let values_str = match entry {
-                Some(CoordEntry::Ready(vals)) => vals.format_summary(3, 3),
-                Some(CoordEntry::Pending) => "loading...".to_string(),
-                Some(CoordEntry::Failed(_)) | None => String::new(),
-            };
+            let size_pad = max_size.saturating_sub(size_str.len());
+            let dtype_pad = max_dtype.saturating_sub(dtype.len());
 
             let _ = crossterm::execute!(
                 out,
                 Print(format!("    * {}{}", coord_arr.name, " ".repeat(name_pad))),
                 SetForegroundColor(ctx.palette.dim),
-                Print(format!("({size})  {dtype}")),
+                Print(format!("{size_str}{}  {dtype}", " ".repeat(size_pad))),
                 ResetColor,
             );
             if !values_str.is_empty() {
                 let _ = crossterm::execute!(
                     out,
-                    Print(format!("   {values_str}")),
+                    Print(format!("{}   {values_str}", " ".repeat(dtype_pad))),
                 );
             }
             let _ = crossterm::execute!(out, Print("\n"));

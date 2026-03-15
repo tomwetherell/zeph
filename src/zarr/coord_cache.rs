@@ -146,8 +146,10 @@ impl CoordValues {
     /// Format as "first, first, first, ..., last, last, last".
     pub fn format_summary(&self, head: usize, tail: usize) -> String {
         match self {
-            CoordValues::Float32(v) => fmt_slice(v, head, tail),
-            CoordValues::Float64(v) => fmt_slice(v, head, tail),
+            CoordValues::Float32(v) => {
+                fmt_slice_with(v, head, tail, |v| fmt_float(*v as f64))
+            }
+            CoordValues::Float64(v) => fmt_slice_with(v, head, tail, |v| fmt_float(*v)),
             CoordValues::Int32(v) => fmt_slice(v, head, tail),
             CoordValues::Int64(v) => fmt_slice(v, head, tail),
             CoordValues::Datetime(v) => fmt_slice(v, head, tail),
@@ -171,18 +173,29 @@ impl CoordValues {
 }
 
 fn fmt_slice<T: std::fmt::Display>(values: &[T], head: usize, tail: usize) -> String {
+    fmt_slice_with(values, head, tail, |v| v.to_string())
+}
+
+fn fmt_slice_with<T, F: Fn(&T) -> String>(values: &[T], head: usize, tail: usize, to_str: F) -> String {
     let len = values.len();
     if len <= head + tail {
         values
             .iter()
-            .map(|v| v.to_string())
+            .map(|v| to_str(v))
             .collect::<Vec<_>>()
             .join(", ")
     } else {
-        let head_vals: Vec<String> = values[..head].iter().map(|v| v.to_string()).collect();
-        let tail_vals: Vec<String> = values[len - tail..].iter().map(|v| v.to_string()).collect();
+        let head_vals: Vec<String> = values[..head].iter().map(|v| to_str(v)).collect();
+        let tail_vals: Vec<String> = values[len - tail..].iter().map(|v| to_str(v)).collect();
         format!("{}, ..., {}", head_vals.join(", "), tail_vals.join(", "))
     }
+}
+
+/// Format a float with up to 4 decimal places, stripping trailing zeros.
+fn fmt_float(v: f64) -> String {
+    let s = format!("{:.4}", v);
+    let s = s.trim_end_matches('0').trim_end_matches('.');
+    s.to_string()
 }
 
 // ── CF time decoding ─────────────────────────────────────────────
