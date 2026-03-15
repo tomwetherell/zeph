@@ -4,6 +4,7 @@ mod repl;
 mod ui;
 
 use std::io;
+use std::sync::Arc;
 
 use clap::Parser;
 use crossterm::style::{Print, ResetColor, SetForegroundColor};
@@ -11,6 +12,7 @@ use crossterm::style::{Print, ResetColor, SetForegroundColor};
 use commands::Ctx;
 use ui::spinner::Spinner;
 use ui::style::{self, Palette};
+use zeph::zarr::coord_cache::{self, CoordCache};
 use zeph::zarr::metadata::{self, FetchError};
 use zeph::zarr::store::StoreLocation;
 
@@ -85,10 +87,44 @@ fn main() -> anyhow::Result<()> {
         }
     };
 
+    // Prefetch coordinate array values in the background.
+    let coord_cache = Arc::new(CoordCache::new());
+    let coord_metas: Vec<_> = meta
+        .arrays
+        .iter()
+        .filter(|a| a.is_coordinate() && a.shape[0] <= 1_000_000)
+        .cloned()
+        .collect();
+
+    if !coord_metas.is_empty() {
+        if let Ok(zarrs_store) = build_zarrs_store(&store) {
+            let cache_clone = coord_cache.clone();
+            runtime.spawn(async move {
+                coord_cache::prefetch_coordinates(cache_clone, coord_metas, zarrs_store).await;
+            });
+        }
+    }
+
     ui::welcome::render(&store.display_path(), &palette)?;
 
-    let ctx = Ctx { store, meta, palette };
+    let ctx = Ctx { store, meta, palette, coord_cache, runtime };
     repl::run(&ctx)?;
 
     Ok(())
+}
+
+/// Build a zarrs-compatible async store from our StoreLocation.
+fn build_zarrs_store(
+    location: &StoreLocation,
+) -> anyhow::Result<Arc<dyn zarrs_storage::AsyncReadableStorageTraits>> {
+    match location {
+        StoreLocation::Local(path) => {
+            let local_fs = object_store::local::LocalFileSystem::new_with_prefix(path)?;
+            Ok(Arc::new(zarrs_object_store::AsyncObjectStore::new(local_fs)))
+        }
+        StoreLocation::Cloud { store, base_path, .. } => {
+            let prefixed = object_store::prefix::PrefixStore::new(store.clone(), base_path.clone());
+            Ok(Arc::new(zarrs_object_store::AsyncObjectStore::new(prefixed)))
+        }
+    }
 }

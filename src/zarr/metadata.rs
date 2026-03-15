@@ -7,7 +7,7 @@ use serde_json::Value;
 
 use super::store::StoreLocation;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 #[allow(dead_code)]
 pub struct ArrayMeta {
     pub name: String,
@@ -20,6 +20,14 @@ pub struct ArrayMeta {
     pub fill_value: Option<Value>,
     pub order: Option<String>,
     pub filters: Option<Value>,
+}
+
+impl ArrayMeta {
+    /// A coordinate array is one-dimensional and its single dimension
+    /// name matches the array name (xarray convention).
+    pub fn is_coordinate(&self) -> bool {
+        self.dims.len() == 1 && self.dims[0] == self.name
+    }
 }
 
 #[derive(Debug)]

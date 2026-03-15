@@ -1,10 +1,12 @@
 use std::io::{self, Write};
+use std::time::Duration;
 
 use crossterm::style::{Print, ResetColor, SetForegroundColor};
 use serde_json::Value;
 
 use super::{CommandAction, CommandResult, Ctx};
 use super::summary::{format_bytes, friendly_dtype};
+use zeph::zarr::coord_cache::CoordEntry;
 use zeph::zarr::metadata::ArrayMeta;
 
 pub fn run(ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
@@ -144,6 +146,87 @@ pub fn run(ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
         );
     }
 
+    // Coordinates — show values for dimensions that have coordinate arrays
+    let coord_entries: Vec<(&ArrayMeta, Option<CoordEntry>)> = array
+        .dims
+        .iter()
+        .filter_map(|dim_name| {
+            ctx.meta
+                .arrays
+                .iter()
+                .find(|a| a.is_coordinate() && a.name == *dim_name)
+        })
+        .map(|coord_arr| {
+            let entry = ctx
+                .coord_cache
+                .get_or_wait(&coord_arr.name, Duration::from_millis(200));
+            (coord_arr, entry)
+        })
+        .collect();
+
+    if !coord_entries.is_empty() {
+        let _ = crossterm::execute!(out, Print("\n"));
+        let _ = crossterm::execute!(
+            out,
+            SetForegroundColor(ctx.palette.heading),
+            Print("  Coordinates:\n"),
+            ResetColor,
+        );
+
+        // Pre-compute display data for column alignment
+        let rows: Vec<_> = coord_entries
+            .iter()
+            .map(|(coord_arr, entry)| {
+                let size = coord_arr.shape.first().copied().unwrap_or(0);
+                let size_str = format!("({size})");
+                let dtype: &str = match entry {
+                    Some(CoordEntry::Ready(vals)) if vals.is_datetime() => "datetime64",
+                    _ => friendly_dtype(&coord_arr.dtype),
+                };
+                let values_str = match entry {
+                    Some(CoordEntry::Ready(vals)) => vals.format_summary(3, 3),
+                    Some(CoordEntry::Pending) => "loading...".to_string(),
+                    Some(CoordEntry::Failed(_)) | None => String::new(),
+                };
+                (coord_arr, size_str, dtype, values_str)
+            })
+            .collect();
+
+        let max_name = rows.iter().map(|(a, _, _, _)| a.name.len()).max().unwrap_or(0);
+        let max_size = rows.iter().map(|(_, s, _, _)| s.len()).max().unwrap_or(0);
+        let max_dtype = rows.iter().map(|(_, _, d, _)| d.len()).max().unwrap_or(0);
+
+        // Column where values start: "      " + max_name + 2 + max_size + "  " + max_dtype + "   "
+        let values_col = 6 + max_name + 2 + max_size + 2 + max_dtype + 3;
+        let term_width = crossterm::terminal::size().map(|(w, _)| w as usize).unwrap_or(80);
+
+        for (coord_arr, size_str, dtype, values_str) in &rows {
+            let name_pad = max_name.saturating_sub(coord_arr.name.len()) + 2;
+            let size_pad = max_size.saturating_sub(size_str.len());
+            let dtype_pad = max_dtype.saturating_sub(dtype.len());
+
+            let _ = crossterm::execute!(
+                out,
+                Print(format!("      {}{}", coord_arr.name, " ".repeat(name_pad))),
+                SetForegroundColor(ctx.palette.dim),
+                Print(format!("{size_str}{}  {dtype}", " ".repeat(size_pad))),
+                ResetColor,
+            );
+            if !values_str.is_empty() {
+                let wrapped = wrap_at_commas(
+                    values_str,
+                    term_width.saturating_sub(values_col),
+                    values_col,
+                );
+                let _ = crossterm::execute!(
+                    out,
+                    Print(format!("{}   {wrapped}", " ".repeat(dtype_pad))),
+                );
+            }
+            let _ = crossterm::execute!(out, Print("\n"));
+        }
+    }
+
     // Attributes
     let _ = crossterm::execute!(out, Print("\n"));
     let _ = crossterm::execute!(
@@ -240,6 +323,38 @@ fn format_fill_value(fill_value: &Option<Value>) -> String {
         Some(Value::Bool(b)) => b.to_string(),
         Some(other) => other.to_string(),
     }
+}
+
+/// Wrap a comma-separated string so each line fits within `width`.
+/// Continuation lines are indented by `indent` spaces.
+fn wrap_at_commas(s: &str, width: usize, indent: usize) -> String {
+    if width == 0 || s.len() <= width {
+        return s.to_string();
+    }
+
+    let mut result = String::with_capacity(s.len() + indent);
+    let mut line_len = 0;
+
+    for (i, item) in s.split(", ").enumerate() {
+        let chunk = if i == 0 {
+            item.to_string()
+        } else {
+            format!(", {item}")
+        };
+
+        if line_len + chunk.len() > width && line_len > 0 {
+            result.push('\n');
+            result.push_str(&" ".repeat(indent));
+            // Start new line without the leading ", "
+            result.push_str(item);
+            line_len = item.len();
+        } else {
+            result.push_str(&chunk);
+            line_len += chunk.len();
+        }
+    }
+
+    result
 }
 
 fn format_with_commas(n: usize) -> String {
@@ -374,6 +489,24 @@ mod tests {
     fn format_with_commas_millions() {
         assert_eq!(format_with_commas(1_000_000), "1,000,000");
         assert_eq!(format_with_commas(745_472), "745,472");
+    }
+
+    // --- wrap_at_commas ---
+
+    #[test]
+    fn wrap_at_commas_fits_on_one_line() {
+        assert_eq!(wrap_at_commas("1, 2, 3", 20, 10), "1, 2, 3");
+    }
+
+    #[test]
+    fn wrap_at_commas_wraps_with_indent() {
+        let result = wrap_at_commas("aaa, bbb, ccc, ddd", 10, 4);
+        assert_eq!(result, "aaa, bbb\n    ccc, ddd");
+    }
+
+    #[test]
+    fn wrap_at_commas_zero_width_returns_unchanged() {
+        assert_eq!(wrap_at_commas("1, 2, 3", 0, 10), "1, 2, 3");
     }
 
     // --- chunk count computation ---

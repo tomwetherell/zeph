@@ -2,7 +2,10 @@ mod help;
 mod info;
 pub(crate) mod summary;
 
+use std::sync::Arc;
+
 use crate::ui::style::Palette;
+use zeph::zarr::coord_cache::CoordCache;
 use zeph::zarr::metadata::{ArrayMeta, StoreMeta};
 use zeph::zarr::store::StoreLocation;
 
@@ -10,6 +13,10 @@ pub struct Ctx {
     pub store: StoreLocation,
     pub meta: StoreMeta,
     pub palette: Palette,
+    pub coord_cache: Arc<CoordCache>,
+    /// Kept alive so background prefetch tasks can complete.
+    #[allow(dead_code)]
+    pub runtime: tokio::runtime::Runtime,
 }
 
 pub enum Handler {
