@@ -3,6 +3,8 @@ name = "zeph"
 version = "0.1.0"
 edition = "2021"
 description = "A CLI tool for inspecting zarr data stores"
+license = "MIT"
+repository = "https://github.com/tomwetherell/zeph"
 
 [dependencies]
 crossterm = "0.28"
@@ -20,3 +22,7 @@ zarrs_storage = "0.4"
 
 [dev-dependencies]
 tempfile = "3"
+
+[profile.dist]
+inherits = "release"
+lto = "thin"
