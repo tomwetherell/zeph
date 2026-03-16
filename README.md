@@ -2,6 +2,8 @@
 
 `zeph` is a fast CLI tool to inspect local and remote [zarr](https://zarr.dev/) stores. 
 
+![zeph_demo](https://github.com/user-attachments/assets/0bb46852-4191-47a9-b58d-8b4991e614d0)
+
 ## Commands
 
 * `/summary`
