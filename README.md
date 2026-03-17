@@ -6,8 +6,16 @@
 
 ## Commands
 
-* `/summary`
-* `/info`
+| Command | Description |
+| --- | --- |
+| [`/summary`](https://github.com/tomwetherell/zeph/edit/main/README.md#summary) | - |
+| [`/info`](https://github.com/tomwetherell/zeph/edit/main/README.md#info) | - |
+
+### summary
+
+
+### info 
+
 
 ## Limitations 
 
