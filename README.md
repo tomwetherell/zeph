@@ -28,7 +28,7 @@ See the table below for example datasets which can be used for testing.
 | Command | Description |
 | --- | --- |
 | [`/summary`](https://github.com/tomwetherell/zeph?tab=readme-ov-file#summary) | Show an overview of the store (dimensions, variables and attributes) |
-| [`/info`](https://github.com/tomwetherell/zeph?tab=readme-ov-file#info) | Show veriable details (chunking information, coordinates, attributes, and more) |
+| [`/info`](https://github.com/tomwetherell/zeph?tab=readme-ov-file#info) | Show variable details (chunking information, coordinates, attributes, and more) |
 
 ### summary
 
