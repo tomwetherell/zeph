@@ -2,6 +2,8 @@
 
 An interactive CLI tool to quickly and easily inspect zarr stores. Supports local and remote (S3, GCS, Azure, HTTPS) stores. 
 
+![zeph_demo](https://github.com/user-attachments/assets/0bb46852-4191-47a9-b58d-8b4991e614d0)
+
 ## Getting Started 
 
 ### Install prebuilt binaries via shell script
