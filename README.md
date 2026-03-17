@@ -8,8 +8,8 @@ Zeph is an interactive CLI tool to quickly and easily inspect [zarr](https://zar
 
 | Command | Description |
 | --- | --- |
-| [`/summary`](https://github.com/tomwetherell/zeph/blob/main/README.md#summary) | - |
-| [`/info`](https://github.com/tomwetherell/zeph/blob/main/README.md#info) | - |
+| [`/summary`](https://github.com/tomwetherell/zeph?tab=readme-ov-file#summary) | - |
+| [`/info`](https://github.com/tomwetherell/zeph?tab=readme-ov-file#info) | - |
 
 ### summary
 
