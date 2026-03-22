@@ -442,7 +442,7 @@ fn format_compressor(compressor: &Option<Value>) -> String {
                         2 => "bitshuffle",
                         _ => "?",
                     };
-                    format!("blosc / {cname}  (level {clevel}, {shuffle_str})")
+                    format!("blosc ({cname}, level {clevel}, {shuffle_str})")
                 }
                 "zstd" => {
                     let level = val.get("level").and_then(|v| v.as_i64()).unwrap_or(0);
@@ -490,7 +490,7 @@ fn format_codecs(codecs: &Value) -> String {
                 ("blosc", Some(cfg)) => {
                     let cname = cfg.get("cname").and_then(|v| v.as_str()).unwrap_or("?");
                     let clevel = cfg.get("clevel").and_then(|v| v.as_u64()).unwrap_or(0);
-                    format!("blosc / {cname} (level {clevel})")
+                    format!("blosc ({cname}, level {clevel})")
                 }
                 ("zstd", Some(cfg)) => {
                     let level = cfg.get("level").and_then(|v| v.as_i64()).unwrap_or(0);
@@ -630,7 +630,7 @@ mod tests {
         });
         assert_eq!(
             format_compressor(&Some(val)),
-            "blosc / lz4  (level 5, shuffle)"
+            "blosc (lz4, level 5, shuffle)"
         );
     }
 
@@ -673,7 +673,7 @@ mod tests {
         ]);
         assert_eq!(
             format_codecs(&codecs),
-            "bytes (little-endian) → blosc / lz4 (level 5)"
+            "bytes (little-endian) → blosc (lz4, level 5)"
         );
     }
 
@@ -738,7 +738,7 @@ mod tests {
         ]);
         assert_eq!(
             format_codecs(&inner_codecs),
-            "bytes (little-endian) → blosc / zstd (level 3)"
+            "bytes (little-endian) → blosc (zstd, level 3)"
         );
     }
 
