@@ -29,9 +29,9 @@ fn render_xarray_style(out: &mut impl Write, location: &StoreLocation, store: &S
     // Build dimension sizes from all arrays
     let mut dim_sizes: BTreeMap<String, usize> = BTreeMap::new();
     for arr in &store.arrays {
-        for (i, dim) in arr.dims.iter().enumerate() {
+        for (i, dim) in arr.display_dims().into_iter().enumerate() {
             if let Some(&size) = arr.shape.get(i) {
-                dim_sizes.entry(dim.clone()).or_insert(size);
+                dim_sizes.entry(dim).or_insert(size);
             }
         }
     }
@@ -224,7 +224,7 @@ fn format_dims_parens(arr: &ArrayMeta) -> String {
     if arr.dims.is_empty() {
         String::new()
     } else {
-        format!("({})", arr.dims.join(", "))
+        format!("({})", arr.display_dims().join(", "))
     }
 }
 

@@ -16,8 +16,8 @@ pub fn run(ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
     let dims_str = if array.dims.is_empty() {
         String::new()
     } else {
-        let parts: Vec<String> = array
-            .dims
+        let display_dims = array.display_dims();
+        let parts: Vec<String> = display_dims
             .iter()
             .zip(array.shape.iter())
             .map(|(d, s)| format!("{d}: {s}"))
@@ -129,8 +129,8 @@ pub fn run(ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
             let total_shards: usize = shard_counts.iter().product();
 
             let shard_label: Vec<String> = if !array.dims.is_empty() {
-                array
-                    .dims
+                let display_dims = array.display_dims();
+                display_dims
                     .iter()
                     .zip(shard_counts.iter())
                     .map(|(d, c)| format!("{d}: {c}"))
@@ -193,8 +193,8 @@ pub fn run(ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
                 let total_per_shard: usize = chunks_per_shard.iter().product();
 
                 let per_shard_label: Vec<String> = if !array.dims.is_empty() {
-                    array
-                        .dims
+                    let display_dims = array.display_dims();
+                    display_dims
                         .iter()
                         .zip(chunks_per_shard.iter())
                         .map(|(d, c)| format!("{d}: {c}"))
@@ -251,8 +251,8 @@ pub fn run(ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
             let total_chunks: usize = chunk_counts.iter().product();
 
             let chunk_label: Vec<String> = if !array.dims.is_empty() {
-                array
-                    .dims
+                let display_dims = array.display_dims();
+                display_dims
                     .iter()
                     .zip(chunk_counts.iter())
                     .map(|(d, c)| format!("{d}: {c}"))

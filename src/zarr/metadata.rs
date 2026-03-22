@@ -39,6 +39,23 @@ impl ArrayMeta {
     pub fn is_coordinate(&self) -> bool {
         self.dims.len() == 1 && self.dims[0] == self.name
     }
+
+    /// Return display-friendly dimension labels.
+    /// Named dimensions keep their name; unnamed (empty-string) dimensions
+    /// become `"dim_0"`, `"dim_1"`, etc.
+    pub fn display_dims(&self) -> Vec<String> {
+        self.dims
+            .iter()
+            .enumerate()
+            .map(|(i, d)| {
+                if d.is_empty() {
+                    format!("dim_{i}")
+                } else {
+                    d.clone()
+                }
+            })
+            .collect()
+    }
 }
 
 #[derive(Debug)]
@@ -317,13 +334,15 @@ fn parse_zarr_json(raw: &str) -> anyhow::Result<StoreMeta> {
             .unwrap_or("")
             .to_string();
 
-        // v3 uses dimension_names directly (no _ARRAY_DIMENSIONS indirection)
+        // v3 uses dimension_names directly (no _ARRAY_DIMENSIONS indirection).
+        // Nulls are valid (unnamed dimensions) — map them to "" to keep
+        // dims.len() == shape.len().
         let dims: Vec<String> = node
             .get("dimension_names")
             .and_then(|v| v.as_array())
             .map(|arr| {
                 arr.iter()
-                    .filter_map(|d| d.as_str().map(String::from))
+                    .map(|d| d.as_str().unwrap_or("").to_string())
                     .collect()
             })
             .unwrap_or_default();
@@ -981,6 +1000,26 @@ mod tests {
         "#);
         let meta = parse_zarr_json(&json).unwrap();
         assert_eq!(meta.arrays[0].dims, vec!["x", "y"]);
+    }
+
+    #[test]
+    fn parse_v3_null_dimension_names() {
+        let json = minimal_v3(r#"
+            "temp": {
+                "zarr_format": 3, "node_type": "array",
+                "shape": [10, 20, 30], "data_type": "float64",
+                "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [10, 20, 30]}},
+                "codecs": [], "fill_value": 0,
+                "dimension_names": ["time", null, "lon"],
+                "attributes": {}
+            }
+        "#);
+        let meta = parse_zarr_json(&json).unwrap();
+        // Null entries become "" to keep dims.len() == shape.len()
+        assert_eq!(meta.arrays[0].dims, vec!["time", "", "lon"]);
+        assert_eq!(meta.arrays[0].dims.len(), meta.arrays[0].shape.len());
+        // display_dims replaces "" with positional labels
+        assert_eq!(meta.arrays[0].display_dims(), vec!["time", "dim_1", "lon"]);
     }
 
     #[test]
