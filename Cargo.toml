@@ -14,6 +14,7 @@ chrono = { version = "0.4", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 object_store = { version = "0.13", features = ["aws", "gcp", "azure", "http"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
 tokio = { version = "1", features = ["rt-multi-thread"] }
 url = "2"
 zarrs = { version = "0.23", features = ["async"] }

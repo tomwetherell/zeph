@@ -149,7 +149,7 @@ fn format_item(arr: &ArrayMeta) -> String {
             .collect();
         format!("  ({})", parts.join(", "))
     };
-    let dtype = friendly_dtype(&arr.dtype);
+    let dtype = friendly_dtype(&arr.data_type);
     format!("{}{dims}  {dtype}", arr.name)
 }
 

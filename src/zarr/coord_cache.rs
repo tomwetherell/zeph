@@ -86,7 +86,7 @@ pub async fn prefetch_coordinates(
         let store = store.clone();
         handles.push(tokio::spawn(async move {
             let path = format!("/{}", meta.name);
-            match fetch_one(&store, &path, &meta.dtype).await {
+            match fetch_one(&store, &path, &meta.data_type).await {
                 Ok(values) => {
                     let values = try_decode_cf_time(values, &meta.attrs);
                     cache.set(&meta.name, CoordEntry::Ready(values));
@@ -104,39 +104,39 @@ pub async fn prefetch_coordinates(
 async fn fetch_one(
     store: &Arc<dyn AsyncReadableStorageTraits>,
     path: &str,
-    dtype: &str,
+    data_type: &str,
 ) -> anyhow::Result<CoordValues> {
     let array = Array::async_open(store.clone(), path).await?;
     let shape = array.shape();
     let len = shape[0];
     let subset = ArraySubset::new_with_ranges(&[0..len]);
 
-    match dtype {
-        "<f4" | ">f4" => {
+    match data_type {
+        "float32" | "<f4" | ">f4" => {
             let data: Vec<f32> = array
                 .async_retrieve_array_subset::<Vec<_>>(&subset)
                 .await?;
             Ok(CoordValues::Float32(data))
         }
-        "<f8" | ">f8" => {
+        "float64" | "<f8" | ">f8" => {
             let data: Vec<f64> = array
                 .async_retrieve_array_subset::<Vec<_>>(&subset)
                 .await?;
             Ok(CoordValues::Float64(data))
         }
-        "<i4" | ">i4" => {
+        "int32" | "<i4" | ">i4" => {
             let data: Vec<i32> = array
                 .async_retrieve_array_subset::<Vec<_>>(&subset)
                 .await?;
             Ok(CoordValues::Int32(data))
         }
-        "<i8" | ">i8" => {
+        "int64" | "<i8" | ">i8" => {
             let data: Vec<i64> = array
                 .async_retrieve_array_subset::<Vec<_>>(&subset)
                 .await?;
             Ok(CoordValues::Int64(data))
         }
-        other => anyhow::bail!("Unsupported coordinate dtype: {other}"),
+        other => anyhow::bail!("Unsupported coordinate data type: {other}"),
     }
 }
 

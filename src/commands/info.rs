@@ -37,7 +37,7 @@ pub fn run(ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
     let _ = crossterm::execute!(out, Print("\n"));
 
     // Size
-    let byte_size = dtype_byte_size(&array.dtype);
+    let byte_size = dtype_byte_size(&array.data_type);
     let total_values: usize = array.shape.iter().product();
     let total_bytes = (total_values * byte_size) as u64;
     let label_width = 13;
@@ -59,7 +59,7 @@ pub fn run(ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
         SetForegroundColor(ctx.palette.heading),
         Print(format!("  {:<label_width$}", "Dtype:")),
         ResetColor,
-        Print(format!("{}\n", friendly_dtype(&array.dtype))),
+        Print(format!("{}\n", friendly_dtype(&array.data_type))),
     );
 
     // Fill value
@@ -71,25 +71,33 @@ pub fn run(ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
         Print(format!("{}\n", format_fill_value(&array.fill_value))),
     );
 
-    // Order
-    if let Some(ref order) = array.order {
+    // Storage: v3 shows codecs, v2 shows order + compressor
+    if let Some(ref codecs) = array.codecs {
         let _ = crossterm::execute!(
             out,
             SetForegroundColor(ctx.palette.heading),
-            Print(format!("  {:<label_width$}", "Order:")),
+            Print(format!("  {:<label_width$}", "Codecs:")),
             ResetColor,
-            Print(format!("{order}\n")),
+            Print(format!("{}\n", format_codecs(codecs))),
+        );
+    } else {
+        if let Some(ref order) = array.order {
+            let _ = crossterm::execute!(
+                out,
+                SetForegroundColor(ctx.palette.heading),
+                Print(format!("  {:<label_width$}", "Order:")),
+                ResetColor,
+                Print(format!("{order}\n")),
+            );
+        }
+        let _ = crossterm::execute!(
+            out,
+            SetForegroundColor(ctx.palette.heading),
+            Print(format!("  {:<label_width$}", "Compressor:")),
+            ResetColor,
+            Print(format!("{}\n", format_compressor(&array.compressor))),
         );
     }
-
-    // Compressor
-    let _ = crossterm::execute!(
-        out,
-        SetForegroundColor(ctx.palette.heading),
-        Print(format!("  {:<label_width$}", "Compressor:")),
-        ResetColor,
-        Print(format!("{}\n", format_compressor(&array.compressor))),
-    );
 
     // Chunks
     if !array.chunks.is_empty() {
@@ -181,7 +189,7 @@ pub fn run(ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
                 let size_str = format!("({size})");
                 let dtype: &str = match entry {
                     Some(CoordEntry::Ready(vals)) if vals.is_datetime() => "datetime64",
-                    _ => friendly_dtype(&coord_arr.dtype),
+                    _ => friendly_dtype(&coord_arr.data_type),
                 };
                 let values_str = match entry {
                     Some(CoordEntry::Ready(vals)) => vals.format_summary(3, 3),
@@ -269,8 +277,14 @@ pub fn run(ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
     }
 }
 
-fn dtype_byte_size(dtype: &str) -> usize {
-    match dtype {
+fn dtype_byte_size(data_type: &str) -> usize {
+    match data_type {
+        // v3-style (canonical)
+        "float32" | "int32" | "uint32" => 4,
+        "float64" | "int64" | "uint64" => 8,
+        "float16" | "int16" | "uint16" => 2,
+        "uint8" | "bool" | "string" => 1,
+        // v2 legacy fallback
         "<f4" | ">f4" | "<i4" | ">i4" | "<u4" | ">u4" => 4,
         "<f8" | ">f8" | "<i8" | ">i8" | "<u8" | ">u8" => 8,
         "<f2" | ">f2" | "<i2" | ">i2" | "<u2" | ">u2" => 2,
@@ -312,6 +326,45 @@ fn format_compressor(compressor: &Option<Value>) -> String {
             }
         }
     }
+}
+
+/// Format a v3 codec pipeline for display, e.g. "bytes (little-endian) → zstd (level 3)".
+fn format_codecs(codecs: &Value) -> String {
+    let arr = match codecs.as_array() {
+        Some(a) if !a.is_empty() => a,
+        _ => return "none".to_string(),
+    };
+    arr.iter()
+        .map(|c| {
+            let name = c.get("name").and_then(|v| v.as_str()).unwrap_or("unknown");
+            let config = c.get("configuration").and_then(|v| v.as_object());
+            match (name, config) {
+                ("bytes", Some(cfg)) => {
+                    let endian = cfg.get("endian").and_then(|v| v.as_str()).unwrap_or("?");
+                    format!("bytes ({endian}-endian)")
+                }
+                ("transpose", Some(cfg)) => {
+                    let order = cfg.get("order").and_then(|v| v.as_str()).unwrap_or("?");
+                    format!("transpose ({order})")
+                }
+                ("blosc", Some(cfg)) => {
+                    let cname = cfg.get("cname").and_then(|v| v.as_str()).unwrap_or("?");
+                    let clevel = cfg.get("clevel").and_then(|v| v.as_u64()).unwrap_or(0);
+                    format!("blosc / {cname} (level {clevel})")
+                }
+                ("zstd", Some(cfg)) => {
+                    let level = cfg.get("level").and_then(|v| v.as_i64()).unwrap_or(0);
+                    format!("zstd (level {level})")
+                }
+                ("gzip", Some(cfg)) => {
+                    let level = cfg.get("level").and_then(|v| v.as_i64()).unwrap_or(0);
+                    format!("gzip (level {level})")
+                }
+                (n, _) => n.to_string(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" → ")
 }
 
 fn format_fill_value(fill_value: &Option<Value>) -> String {
@@ -409,6 +462,16 @@ mod tests {
     }
 
     #[test]
+    fn dtype_byte_size_v3_names() {
+        assert_eq!(dtype_byte_size("float32"), 4);
+        assert_eq!(dtype_byte_size("float64"), 8);
+        assert_eq!(dtype_byte_size("int32"), 4);
+        assert_eq!(dtype_byte_size("int64"), 8);
+        assert_eq!(dtype_byte_size("uint8"), 1);
+        assert_eq!(dtype_byte_size("bool"), 1);
+    }
+
+    #[test]
     fn dtype_byte_size_unknown_defaults_to_4() {
         assert_eq!(dtype_byte_size("<c16"), 4);
         assert_eq!(dtype_byte_size("object"), 4);
@@ -446,6 +509,45 @@ mod tests {
     #[test]
     fn format_compressor_none() {
         assert_eq!(format_compressor(&None), "none");
+    }
+
+    // --- format_codecs ---
+
+    #[test]
+    fn format_codecs_bytes_and_zstd() {
+        let codecs = serde_json::json!([
+            {"name": "bytes", "configuration": {"endian": "little"}},
+            {"name": "zstd", "configuration": {"level": 3, "checksum": false}}
+        ]);
+        assert_eq!(
+            format_codecs(&codecs),
+            "bytes (little-endian) → zstd (level 3)"
+        );
+    }
+
+    #[test]
+    fn format_codecs_blosc() {
+        let codecs = serde_json::json!([
+            {"name": "bytes", "configuration": {"endian": "little"}},
+            {"name": "blosc", "configuration": {"cname": "lz4", "clevel": 5}}
+        ]);
+        assert_eq!(
+            format_codecs(&codecs),
+            "bytes (little-endian) → blosc / lz4 (level 5)"
+        );
+    }
+
+    #[test]
+    fn format_codecs_empty() {
+        assert_eq!(format_codecs(&serde_json::json!([])), "none");
+    }
+
+    #[test]
+    fn format_codecs_single() {
+        let codecs = serde_json::json!([
+            {"name": "bytes", "configuration": {"endian": "big"}}
+        ]);
+        assert_eq!(format_codecs(&codecs), "bytes (big-endian)");
     }
 
     // --- format_fill_value ---
