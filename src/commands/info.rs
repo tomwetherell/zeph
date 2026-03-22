@@ -72,13 +72,18 @@ pub fn run(ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
     );
 
     // Storage: v3 shows codecs, v2 shows order + compressor
+    let sharding_config = array.codecs.as_ref().and_then(find_sharding_config);
+
     if let Some(ref codecs) = array.codecs {
+        let display_codecs = sharding_config
+            .and_then(|cfg| cfg.get("codecs"))
+            .unwrap_or(codecs);
         let _ = crossterm::execute!(
             out,
             SetForegroundColor(ctx.palette.heading),
             Print(format!("  {:<label_width$}", "Codecs:")),
             ResetColor,
-            Print(format!("{}\n", format_codecs(codecs))),
+            Print(format!("{}\n", format_codecs(display_codecs))),
         );
     } else {
         if let Some(ref order) = array.order {
@@ -99,59 +104,184 @@ pub fn run(ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
         );
     }
 
-    // Chunks
+    // Shards + Chunks (sharded) or just Chunks (non-sharded)
     if !array.chunks.is_empty() {
-        let _ = crossterm::execute!(out, Print("\n"));
+        if let Some(cfg) = sharding_config {
+            // --- Sharded: array.chunks are shard shapes ---
+            let _ = crossterm::execute!(out, Print("\n"));
 
-        let chunk_tuple: Vec<String> = array.chunks.iter().map(|c| c.to_string()).collect();
-        let _ = crossterm::execute!(
-            out,
-            SetForegroundColor(ctx.palette.heading),
-            Print(format!("  {:<label_width$}", "Chunks:")),
-            ResetColor,
-            Print(format!("({})\n", chunk_tuple.join(", "))),
-        );
+            let shard_tuple: Vec<String> =
+                array.chunks.iter().map(|c| c.to_string()).collect();
+            let _ = crossterm::execute!(
+                out,
+                SetForegroundColor(ctx.palette.heading),
+                Print(format!("  {:<label_width$}", "Shards:")),
+                ResetColor,
+                Print(format!("({})\n", shard_tuple.join(", "))),
+            );
 
-        // Per-dim chunk count
-        let chunk_counts: Vec<usize> = array
-            .shape
-            .iter()
-            .zip(array.chunks.iter())
-            .map(|(&s, &c)| if c == 0 { 0 } else { (s + c - 1) / c })
-            .collect();
-        let total_chunks: usize = chunk_counts.iter().product();
-
-        let chunk_label: Vec<String> = if !array.dims.is_empty() {
-            array
-                .dims
+            let shard_counts: Vec<usize> = array
+                .shape
                 .iter()
-                .zip(chunk_counts.iter())
-                .map(|(d, c)| format!("{d}: {c}"))
-                .collect()
+                .zip(array.chunks.iter())
+                .map(|(&s, &c)| if c == 0 { 0 } else { (s + c - 1) / c })
+                .collect();
+            let total_shards: usize = shard_counts.iter().product();
+
+            let shard_label: Vec<String> = if !array.dims.is_empty() {
+                array
+                    .dims
+                    .iter()
+                    .zip(shard_counts.iter())
+                    .map(|(d, c)| format!("{d}: {c}"))
+                    .collect()
+            } else {
+                shard_counts.iter().map(|c| c.to_string()).collect()
+            };
+
+            let shard_word = if total_shards == 1 { "shard" } else { "shards" };
+            let _ = crossterm::execute!(
+                out,
+                Print(format!(
+                    "  {:<label_width$}{total_shards} {shard_word}  [{}]\n",
+                    "",
+                    shard_label.join(", "),
+                )),
+            );
+
+            let shard_values: usize = array.chunks.iter().product();
+            let shard_bytes = (shard_values * byte_size) as u64;
+            let _ = crossterm::execute!(
+                out,
+                Print(format!(
+                    "  {:<label_width$}{} per shard\n",
+                    "",
+                    format_bytes(shard_bytes),
+                )),
+            );
+
+            // Inner chunks from sharding config
+            let inner_chunks: Vec<usize> = cfg
+                .get("chunk_shape")
+                .and_then(|v| v.as_array())
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|v| v.as_u64().map(|n| n as usize))
+                        .collect()
+                })
+                .unwrap_or_default();
+
+            if !inner_chunks.is_empty() {
+                let _ = crossterm::execute!(out, Print("\n"));
+
+                let chunk_tuple: Vec<String> =
+                    inner_chunks.iter().map(|c| c.to_string()).collect();
+                let _ = crossterm::execute!(
+                    out,
+                    SetForegroundColor(ctx.palette.heading),
+                    Print(format!("  {:<label_width$}", "Chunks:")),
+                    ResetColor,
+                    Print(format!("({})\n", chunk_tuple.join(", "))),
+                );
+
+                let chunks_per_shard: Vec<usize> = array
+                    .chunks
+                    .iter()
+                    .zip(inner_chunks.iter())
+                    .map(|(&s, &c)| if c == 0 { 0 } else { s / c })
+                    .collect();
+                let total_per_shard: usize = chunks_per_shard.iter().product();
+
+                let per_shard_label: Vec<String> = if !array.dims.is_empty() {
+                    array
+                        .dims
+                        .iter()
+                        .zip(chunks_per_shard.iter())
+                        .map(|(d, c)| format!("{d}: {c}"))
+                        .collect()
+                } else {
+                    chunks_per_shard.iter().map(|c| c.to_string()).collect()
+                };
+
+                let chunk_word = if total_per_shard == 1 {
+                    "chunk"
+                } else {
+                    "chunks"
+                };
+                let _ = crossterm::execute!(
+                    out,
+                    Print(format!(
+                        "  {:<label_width$}{total_per_shard} {chunk_word} per shard  [{}]\n",
+                        "",
+                        per_shard_label.join(", "),
+                    )),
+                );
+
+                let chunk_values: usize = inner_chunks.iter().product();
+                let chunk_bytes = (chunk_values * byte_size) as u64;
+                let _ = crossterm::execute!(
+                    out,
+                    Print(format!(
+                        "  {:<label_width$}{} per chunk\n",
+                        "",
+                        format_bytes(chunk_bytes),
+                    )),
+                );
+            }
         } else {
-            chunk_counts.iter().map(|c| c.to_string()).collect()
-        };
+            // --- Non-sharded: original display ---
+            let _ = crossterm::execute!(out, Print("\n"));
 
-        let chunk_word = if total_chunks == 1 { "chunk" } else { "chunks" };
-        let _ = crossterm::execute!(
-            out,
-            Print(format!(
-                "  {:<label_width$}{total_chunks} {chunk_word}  [{}]\n",
-                "",
-                chunk_label.join(", "),
-            )),
-        );
+            let chunk_tuple: Vec<String> =
+                array.chunks.iter().map(|c| c.to_string()).collect();
+            let _ = crossterm::execute!(
+                out,
+                SetForegroundColor(ctx.palette.heading),
+                Print(format!("  {:<label_width$}", "Chunks:")),
+                ResetColor,
+                Print(format!("({})\n", chunk_tuple.join(", "))),
+            );
 
-        let chunk_values: usize = array.chunks.iter().product();
-        let chunk_bytes = (chunk_values * byte_size) as u64;
-        let _ = crossterm::execute!(
-            out,
-            Print(format!(
-                "  {:<label_width$}{} per chunk\n",
-                "",
-                format_bytes(chunk_bytes),
-            )),
-        );
+            let chunk_counts: Vec<usize> = array
+                .shape
+                .iter()
+                .zip(array.chunks.iter())
+                .map(|(&s, &c)| if c == 0 { 0 } else { (s + c - 1) / c })
+                .collect();
+            let total_chunks: usize = chunk_counts.iter().product();
+
+            let chunk_label: Vec<String> = if !array.dims.is_empty() {
+                array
+                    .dims
+                    .iter()
+                    .zip(chunk_counts.iter())
+                    .map(|(d, c)| format!("{d}: {c}"))
+                    .collect()
+            } else {
+                chunk_counts.iter().map(|c| c.to_string()).collect()
+            };
+
+            let chunk_word = if total_chunks == 1 { "chunk" } else { "chunks" };
+            let _ = crossterm::execute!(
+                out,
+                Print(format!(
+                    "  {:<label_width$}{total_chunks} {chunk_word}  [{}]\n",
+                    "",
+                    chunk_label.join(", "),
+                )),
+            );
+
+            let chunk_values: usize = array.chunks.iter().product();
+            let chunk_bytes = (chunk_values * byte_size) as u64;
+            let _ = crossterm::execute!(
+                out,
+                Print(format!(
+                    "  {:<label_width$}{} per chunk\n",
+                    "",
+                    format_bytes(chunk_bytes),
+                )),
+            );
+        }
     }
 
     // Coordinates — show values for dimensions that have coordinate arrays
@@ -326,6 +456,16 @@ fn format_compressor(compressor: &Option<Value>) -> String {
             }
         }
     }
+}
+
+/// If the codec pipeline includes sharding, return its configuration object.
+fn find_sharding_config(codecs: &Value) -> Option<&serde_json::Map<String, Value>> {
+    codecs
+        .as_array()?
+        .iter()
+        .find(|c| c.get("name").and_then(|v| v.as_str()) == Some("sharding_indexed"))
+        .and_then(|c| c.get("configuration"))
+        .and_then(|v| v.as_object())
 }
 
 /// Format a v3 codec pipeline for display, e.g. "bytes (little-endian) → zstd (level 3)".
@@ -548,6 +688,58 @@ mod tests {
             {"name": "bytes", "configuration": {"endian": "big"}}
         ]);
         assert_eq!(format_codecs(&codecs), "bytes (big-endian)");
+    }
+
+    // --- find_sharding_config ---
+
+    #[test]
+    fn find_sharding_config_present() {
+        let codecs = serde_json::json!([{
+            "name": "sharding_indexed",
+            "configuration": {
+                "chunk_shape": [1440, 32, 32],
+                "codecs": [
+                    {"name": "bytes", "configuration": {"endian": "little"}},
+                    {"name": "blosc", "configuration": {"cname": "zstd", "clevel": 3}}
+                ],
+                "index_codecs": [{"name": "bytes", "configuration": {"endian": "little"}}],
+                "index_location": "end"
+            }
+        }]);
+        let cfg = find_sharding_config(&codecs).unwrap();
+        let chunk_shape = cfg["chunk_shape"].as_array().unwrap();
+        assert_eq!(chunk_shape.len(), 3);
+        assert_eq!(chunk_shape[0], 1440);
+    }
+
+    #[test]
+    fn find_sharding_config_absent() {
+        let codecs = serde_json::json!([
+            {"name": "bytes", "configuration": {"endian": "little"}},
+            {"name": "zstd", "configuration": {"level": 3}}
+        ]);
+        assert!(find_sharding_config(&codecs).is_none());
+    }
+
+    #[test]
+    fn find_sharding_config_empty() {
+        assert!(find_sharding_config(&serde_json::json!([])).is_none());
+    }
+
+    // --- format_codecs with sharding inner codecs ---
+
+    #[test]
+    fn format_codecs_sharding_inner_pipeline() {
+        // When we extract the inner codecs from a sharding config, format_codecs
+        // should format them normally
+        let inner_codecs = serde_json::json!([
+            {"name": "bytes", "configuration": {"endian": "little"}},
+            {"name": "blosc", "configuration": {"cname": "zstd", "clevel": 3}}
+        ]);
+        assert_eq!(
+            format_codecs(&inner_codecs),
+            "bytes (little-endian) → blosc / zstd (level 3)"
+        );
     }
 
     // --- format_fill_value ---
