@@ -328,11 +328,14 @@ fn parse_zarr_json(raw: &str) -> anyhow::Result<StoreMeta> {
             })
             .unwrap_or_default();
 
-        let data_type = node
-            .get("data_type")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string();
+        let data_type = match node.get("data_type") {
+            Some(v) if v.is_string() => v.as_str().unwrap_or("").to_string(),
+            Some(v) if v.is_object() => v.get("name")
+                .and_then(|n| n.as_str())
+                .unwrap_or("")
+                .to_string(),
+            _ => String::new(),
+        };
 
         // v3 uses dimension_names directly (no _ARRAY_DIMENSIONS indirection).
         // Nulls are valid (unnamed dimensions) — map them to "" to keep
@@ -1121,6 +1124,20 @@ mod tests {
         "#);
         let meta = parse_zarr_json(&json).unwrap();
         assert!(meta.arrays[0].chunks.is_empty());
+    }
+
+    #[test]
+    fn parse_v3_object_data_type() {
+        let json = minimal_v3(r#"
+            "timestamps": {
+                "zarr_format": 3, "node_type": "array",
+                "shape": [100], "data_type": {"name": "numpy.datetime64", "configuration": {"unit": "ns", "scale_factor": 1}},
+                "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [100]}},
+                "codecs": [], "fill_value": 0, "attributes": {}
+            }
+        "#);
+        let meta = parse_zarr_json(&json).unwrap();
+        assert_eq!(meta.arrays[0].data_type, "numpy.datetime64");
     }
 
     // --- fetch_store_meta error classification ---
