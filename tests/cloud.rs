@@ -85,11 +85,17 @@ fn cloud_https_gefs_v3() {
 
     // Representative data variables
     assert!(meta.arrays.iter().any(|a| a.name == "temperature_2m"));
-    assert!(meta.arrays.iter().any(|a| a.name == "precipitation_surface"));
+    assert!(meta
+        .arrays
+        .iter()
+        .any(|a| a.name == "precipitation_surface"));
     assert!(meta.arrays.iter().any(|a| a.name == "wind_u_10m"));
     assert!(meta.arrays.iter().any(|a| a.name == "wind_v_10m"));
     assert!(meta.arrays.iter().any(|a| a.name == "pressure_surface"));
-    assert!(meta.arrays.iter().any(|a| a.name == "geopotential_height_500hpa"));
+    assert!(meta
+        .arrays
+        .iter()
+        .any(|a| a.name == "geopotential_height_500hpa"));
 
     // Root attributes are present (non-empty)
     assert!(!meta.root_attrs.is_empty());

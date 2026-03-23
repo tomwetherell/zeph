@@ -75,8 +75,12 @@ fn query_osc11() -> Option<Theme> {
         let mut buf = [0u8; 64];
         let mut stdin = io::stdin();
         match stdin.read(&mut buf) {
-            Ok(n) => { let _ = tx.send(buf[..n].to_vec()); }
-            Err(_) => { let _ = tx.send(Vec::new()); }
+            Ok(n) => {
+                let _ = tx.send(buf[..n].to_vec());
+            }
+            Err(_) => {
+                let _ = tx.send(Vec::new());
+            }
         }
     });
 

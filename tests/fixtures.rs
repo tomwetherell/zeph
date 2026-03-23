@@ -26,8 +26,14 @@ fn parse_wb2_era5_fixture() {
     assert_eq!(time.shape, vec![28]);
     assert_eq!(time.data_type, "int64");
     assert_eq!(time.dims, vec!["time"]);
-    assert_eq!(time.attrs["units"], serde_json::json!("hours since 1959-01-01"));
-    assert_eq!(time.attrs["calendar"], serde_json::json!("proleptic_gregorian"));
+    assert_eq!(
+        time.attrs["units"],
+        serde_json::json!("hours since 1959-01-01")
+    );
+    assert_eq!(
+        time.attrs["calendar"],
+        serde_json::json!("proleptic_gregorian")
+    );
 
     let latitude = meta.arrays.iter().find(|a| a.name == "latitude").unwrap();
     assert_eq!(latitude.shape, vec![32]);
@@ -46,17 +52,28 @@ fn parse_wb2_era5_fixture() {
 
     // --- 4D pressure-level variable ---
 
-    let temp = meta.arrays.iter().find(|a| a.name == "temperature").unwrap();
+    let temp = meta
+        .arrays
+        .iter()
+        .find(|a| a.name == "temperature")
+        .unwrap();
     assert_eq!(temp.shape, vec![28, 13, 64, 32]);
     assert_eq!(temp.data_type, "float32");
     assert_eq!(temp.dims, vec!["time", "level", "longitude", "latitude"]);
     assert_eq!(temp.attrs["units"], serde_json::json!("K"));
     assert_eq!(temp.attrs["long_name"], serde_json::json!("Temperature"));
-    assert_eq!(temp.attrs["standard_name"], serde_json::json!("air_temperature"));
+    assert_eq!(
+        temp.attrs["standard_name"],
+        serde_json::json!("air_temperature")
+    );
 
     // --- 3D surface variable ---
 
-    let t2m = meta.arrays.iter().find(|a| a.name == "2m_temperature").unwrap();
+    let t2m = meta
+        .arrays
+        .iter()
+        .find(|a| a.name == "2m_temperature")
+        .unwrap();
     assert_eq!(t2m.shape, vec![28, 64, 32]);
     assert_eq!(t2m.data_type, "float32");
     assert_eq!(t2m.dims, vec!["time", "longitude", "latitude"]);
@@ -65,7 +82,11 @@ fn parse_wb2_era5_fixture() {
 
     // --- 2D static field ---
 
-    let lsm = meta.arrays.iter().find(|a| a.name == "land_sea_mask").unwrap();
+    let lsm = meta
+        .arrays
+        .iter()
+        .find(|a| a.name == "land_sea_mask")
+        .unwrap();
     assert_eq!(lsm.shape, vec![64, 32]);
     assert_eq!(lsm.data_type, "float32");
     assert_eq!(lsm.dims, vec!["longitude", "latitude"]);
@@ -108,7 +129,10 @@ fn parse_v3_sample_fixture() {
     // Top-level metadata
     assert_eq!(meta.zarr_format, 3);
     assert_eq!(meta.root_attrs["Conventions"], serde_json::json!("CF-1.8"));
-    assert_eq!(meta.root_attrs["title"], serde_json::json!("Sample v3 Dataset"));
+    assert_eq!(
+        meta.root_attrs["title"],
+        serde_json::json!("Sample v3 Dataset")
+    );
 
     // Groups are skipped — only arrays are parsed
     assert_eq!(meta.arrays.len(), 5);
@@ -127,8 +151,14 @@ fn parse_v3_sample_fixture() {
     assert_eq!(time.data_type, "int64");
     assert_eq!(time.dims, vec!["time"]);
     assert!(time.is_coordinate());
-    assert_eq!(time.attrs["units"], serde_json::json!("hours since 2020-01-01"));
-    assert_eq!(time.attrs["calendar"], serde_json::json!("proleptic_gregorian"));
+    assert_eq!(
+        time.attrs["units"],
+        serde_json::json!("hours since 2020-01-01")
+    );
+    assert_eq!(
+        time.attrs["calendar"],
+        serde_json::json!("proleptic_gregorian")
+    );
     assert_eq!(time.chunks, vec![24]);
 
     let lat = meta.arrays.iter().find(|a| a.name == "lat").unwrap();
@@ -145,14 +175,21 @@ fn parse_v3_sample_fixture() {
 
     // --- Data variables ---
 
-    let temp = meta.arrays.iter().find(|a| a.name == "temperature").unwrap();
+    let temp = meta
+        .arrays
+        .iter()
+        .find(|a| a.name == "temperature")
+        .unwrap();
     assert_eq!(temp.shape, vec![24, 180, 360]);
     assert_eq!(temp.data_type, "float32");
     assert_eq!(temp.dims, vec!["time", "lat", "lon"]);
     assert!(!temp.is_coordinate());
     assert_eq!(temp.attrs["units"], serde_json::json!("K"));
     assert_eq!(temp.attrs["long_name"], serde_json::json!("Temperature"));
-    assert_eq!(temp.attrs["standard_name"], serde_json::json!("air_temperature"));
+    assert_eq!(
+        temp.attrs["standard_name"],
+        serde_json::json!("air_temperature")
+    );
 
     // v3 storage fields
     assert_eq!(temp.chunks, vec![6, 90, 180]);

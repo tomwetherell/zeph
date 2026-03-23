@@ -28,9 +28,7 @@ fn main() -> anyhow::Result<()> {
 
     let input = match cli.path {
         Some(p) => p,
-        None => std::env::current_dir()?
-            .to_string_lossy()
-            .into_owned(),
+        None => std::env::current_dir()?.to_string_lossy().into_owned(),
     };
 
     let palette = Palette::new(style::detect_color_support(), style::detect_theme());
@@ -112,7 +110,13 @@ fn main() -> anyhow::Result<()> {
 
     ui::welcome::render(&store.display_path(), &palette)?;
 
-    let ctx = Ctx { store, meta, palette, coord_cache, runtime };
+    let ctx = Ctx {
+        store,
+        meta,
+        palette,
+        coord_cache,
+        runtime,
+    };
     repl::run(&ctx)?;
 
     Ok(())
@@ -125,11 +129,17 @@ fn build_zarrs_store(
     match location {
         StoreLocation::Local(path) => {
             let local_fs = object_store::local::LocalFileSystem::new_with_prefix(path)?;
-            Ok(Arc::new(zarrs_object_store::AsyncObjectStore::new(local_fs)))
+            Ok(Arc::new(zarrs_object_store::AsyncObjectStore::new(
+                local_fs,
+            )))
         }
-        StoreLocation::Cloud { store, base_path, .. } => {
+        StoreLocation::Cloud {
+            store, base_path, ..
+        } => {
             let prefixed = object_store::prefix::PrefixStore::new(store.clone(), base_path.clone());
-            Ok(Arc::new(zarrs_object_store::AsyncObjectStore::new(prefixed)))
+            Ok(Arc::new(zarrs_object_store::AsyncObjectStore::new(
+                prefixed,
+            )))
         }
     }
 }
