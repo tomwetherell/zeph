@@ -3128,9 +3128,12 @@ name = "zeph"
 version = "0.2.0"
 dependencies = [
  "anyhow",
+ "async-trait",
+ "bytes",
  "chrono",
  "clap",
  "crossterm",
+ "futures",
  "object_store",
  "reqwest",
  "serde",

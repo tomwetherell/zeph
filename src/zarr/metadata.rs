@@ -180,11 +180,6 @@ fn fetch_raw_file(
                         )
                     })
                 }
-                // object_store's HTTP client requires Content-Length in responses,
-                // but some CDNs (e.g. Cloudflare) omit it. Fall back to reqwest.
-                Err(object_store::Error::Generic { store: "HTTP", .. }) => {
-                    fetch_http_direct(url, filename, runtime)
-                }
                 Err(e) => Err(classify_cloud_error(e, url)),
             }
         }
@@ -214,39 +209,6 @@ fn classify_cloud_error(err: object_store::Error, url: &str) -> FetchError {
         }
         other => FetchError::Other(anyhow::Error::from(other)),
     }
-}
-
-/// Fetch a file directly via HTTP, bypassing object_store.
-///
-/// Used as a fallback when object_store's HTTP client fails (e.g. because the
-/// server omits the Content-Length header, which some CDNs like Cloudflare do
-/// when the client doesn't request compression).
-fn fetch_http_direct(
-    base_url: &str,
-    filename: &str,
-    runtime: &tokio::runtime::Runtime,
-) -> Result<String, FetchError> {
-    let file_url = format!("{}/{}", base_url.trim_end_matches('/'), filename);
-    let response = runtime
-        .block_on(reqwest::get(&file_url))
-        .map_err(|e| FetchError::Other(anyhow::Error::from(e).context("HTTP request failed")))?;
-
-    if response.status() == reqwest::StatusCode::NOT_FOUND {
-        return Err(FetchError::NotFound(format!(
-            "{filename} not found at {base_url}"
-        )));
-    }
-
-    if !response.status().is_success() {
-        return Err(FetchError::Other(anyhow::anyhow!(
-            "HTTP {} fetching {file_url}",
-            response.status()
-        )));
-    }
-
-    runtime
-        .block_on(response.text())
-        .map_err(|e| FetchError::Other(anyhow::Error::from(e).context("Failed to read response body")))
 }
 
 /// Return provider-specific credential guidance based on the URL scheme.

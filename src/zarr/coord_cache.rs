@@ -91,7 +91,9 @@ pub async fn prefetch_coordinates(
                     let values = try_decode_cf_time(values, &meta.attrs);
                     cache.set(&meta.name, CoordEntry::Ready(values));
                 }
-                Err(e) => cache.set(&meta.name, CoordEntry::Failed(format!("{e:#}"))),
+                Err(e) => {
+                    cache.set(&meta.name, CoordEntry::Failed(format!("{e:#}")));
+                }
             }
         }));
     }
