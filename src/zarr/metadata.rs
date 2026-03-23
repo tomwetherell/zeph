@@ -447,7 +447,7 @@ fn parse_zmetadata(raw: &str) -> anyhow::Result<StoreMeta> {
         if let Some(name) = key.strip_suffix("/.zarray") {
             zarray_map.insert(name.to_string(), val);
         } else if let Some(name) = key.strip_suffix("/.zattrs") {
-            if name != "" {
+            if !name.is_empty() {
                 zattrs_map.insert(name.to_string(), val);
             }
         }

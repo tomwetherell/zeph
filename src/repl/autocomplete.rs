@@ -91,9 +91,7 @@ pub fn run(buffer: &mut String, commands: &[Command], palette: &Palette) -> anyh
                     return Ok(Result::Submitted);
                 }
                 (KeyCode::Up, _) => {
-                    if selected > 0 {
-                        selected -= 1;
-                    }
+                    selected = selected.saturating_sub(1);
                 }
                 (KeyCode::Down, _) => {
                     if selected + 1 < filtered.len() {

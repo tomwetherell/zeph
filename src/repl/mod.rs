@@ -12,53 +12,48 @@ use crate::commands::{self, CommandAction, Ctx, Handler};
 pub fn run(ctx: &Ctx) -> anyhow::Result<()> {
     let commands = commands::all_commands();
     let mut history = history::History::new();
-    loop {
-        match input::read_input(&commands, &ctx.palette, &mut history)? {
-            input::Input::Command(name) => {
-                history.push(name.clone());
-                let cmd = commands
-                    .iter()
-                    .find(|c| c.name == name || c.aliases.contains(&name.as_str()));
-                let result = match cmd {
-                    Some(c) => match &c.handler {
-                        Handler::Immediate(f) => f(ctx),
-                        Handler::TargetSelect(f) => {
-                            match picker::run(&ctx.meta.arrays, &ctx.palette)? {
-                                Some(idx) => f(ctx, &ctx.meta.arrays[idx]),
-                                None => continue,
-                            }
-                        }
-                    },
-                    None => {
-                        let mut out = io::stdout();
-                        let _ = crossterm::execute!(
-                            out,
-                            SetForegroundColor(ctx.palette.dim),
-                            Print(format!("  ⎿  Unknown command: {name}\n")),
-                            ResetColor,
-                        );
-                        continue;
-                    }
-                };
-                if let Some(msg) = &result.subtitle {
-                    let mut out = io::stdout();
-                    let _ = crossterm::execute!(
-                        out,
-                        SetForegroundColor(ctx.palette.dim),
-                        Print(format!("  ⎿  {msg}\n")),
-                        ResetColor,
-                    );
-                    let _ = out.flush();
-                }
-                match result.action {
-                    CommandAction::Quit => {
-                        println!();
-                        break;
-                    }
-                    CommandAction::Continue => {}
-                }
+    while let input::Input::Command(name) =
+        input::read_input(&commands, &ctx.palette, &mut history)?
+    {
+        history.push(name.clone());
+        let cmd = commands
+            .iter()
+            .find(|c| c.name == name || c.aliases.contains(&name.as_str()));
+        let result = match cmd {
+            Some(c) => match &c.handler {
+                Handler::Immediate(f) => f(ctx),
+                Handler::TargetSelect(f) => match picker::run(&ctx.meta.arrays, &ctx.palette)? {
+                    Some(idx) => f(ctx, &ctx.meta.arrays[idx]),
+                    None => continue,
+                },
+            },
+            None => {
+                let mut out = io::stdout();
+                let _ = crossterm::execute!(
+                    out,
+                    SetForegroundColor(ctx.palette.dim),
+                    Print(format!("  ⎿  Unknown command: {name}\n")),
+                    ResetColor,
+                );
+                continue;
             }
-            input::Input::Quit => break,
+        };
+        if let Some(msg) = &result.subtitle {
+            let mut out = io::stdout();
+            let _ = crossterm::execute!(
+                out,
+                SetForegroundColor(ctx.palette.dim),
+                Print(format!("  ⎿  {msg}\n")),
+                ResetColor,
+            );
+            let _ = out.flush();
+        }
+        match result.action {
+            CommandAction::Quit => {
+                println!();
+                break;
+            }
+            CommandAction::Continue => {}
         }
     }
     Ok(())

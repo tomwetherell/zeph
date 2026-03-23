@@ -108,7 +108,7 @@ fn render_xarray_style(
         ResetColor,
     );
     let dims_str: Vec<String> = dim_sizes.iter().map(|(k, v)| format!("{k}: {v}")).collect();
-    let _ = write!(out, "{}\n", dims_str.join(", "));
+    let _ = writeln!(out, "{}", dims_str.join(", "));
 
     // Coordinates
     let _ = crossterm::execute!(

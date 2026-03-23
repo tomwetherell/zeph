@@ -123,7 +123,7 @@ pub fn run(ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
                 .shape
                 .iter()
                 .zip(array.chunks.iter())
-                .map(|(&s, &c)| if c == 0 { 0 } else { (s + c - 1) / c })
+                .map(|(&s, &c)| if c == 0 { 0 } else { s.div_ceil(c) })
                 .collect();
             let total_shards: usize = shard_counts.iter().product();
 
@@ -243,7 +243,7 @@ pub fn run(ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
                 .shape
                 .iter()
                 .zip(array.chunks.iter())
-                .map(|(&s, &c)| if c == 0 { 0 } else { (s + c - 1) / c })
+                .map(|(&s, &c)| if c == 0 { 0 } else { s.div_ceil(c) })
                 .collect();
             let total_chunks: usize = chunk_counts.iter().product();
 
@@ -554,7 +554,7 @@ fn format_with_commas(n: usize) -> String {
     let s = n.to_string();
     let mut result = String::with_capacity(s.len() + s.len() / 3);
     for (i, c) in s.chars().enumerate() {
-        if i > 0 && (s.len() - i) % 3 == 0 {
+        if i > 0 && (s.len() - i).is_multiple_of(3) {
             result.push(',');
         }
         result.push(c);

@@ -35,6 +35,12 @@ pub struct CoordCache {
     inner: Mutex<HashMap<String, CoordEntry>>,
 }
 
+impl Default for CoordCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CoordCache {
     pub fn new() -> Self {
         Self {
@@ -149,6 +155,10 @@ impl CoordValues {
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     pub fn len(&self) -> usize {
         match self {
             CoordValues::Float32(v) => v.len(),
@@ -177,14 +187,10 @@ fn fmt_slice_with<T, F: Fn(&T) -> String>(
 ) -> String {
     let len = values.len();
     if len <= head + tail {
-        values
-            .iter()
-            .map(|v| to_str(v))
-            .collect::<Vec<_>>()
-            .join(", ")
+        values.iter().map(&to_str).collect::<Vec<_>>().join(", ")
     } else {
-        let head_vals: Vec<String> = values[..head].iter().map(|v| to_str(v)).collect();
-        let tail_vals: Vec<String> = values[len - tail..].iter().map(|v| to_str(v)).collect();
+        let head_vals: Vec<String> = values[..head].iter().map(&to_str).collect();
+        let tail_vals: Vec<String> = values[len - tail..].iter().map(to_str).collect();
         format!("{}, ..., {}", head_vals.join(", "), tail_vals.join(", "))
     }
 }

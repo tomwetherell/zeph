@@ -97,9 +97,7 @@ pub fn run(arrays: &[ArrayMeta], palette: &Palette) -> anyhow::Result<Option<usi
                     // No matches — ignore enter
                 }
                 (KeyCode::Up, _) => {
-                    if selected > 0 {
-                        selected -= 1;
-                    }
+                    selected = selected.saturating_sub(1);
                 }
                 (KeyCode::Down, _) => {
                     if selected + 1 < filtered.len() {
