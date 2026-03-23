@@ -113,10 +113,13 @@ cargo test -- --ignored
 | GCS      | CMIP6   | `gs://cmip6/CMIP6/CMIP/MPI-M/MPI-ESM1-2-LR/historical/r10i1p1f1/day/pr/gn/v20190710` |
 | S3       | MUR SST | `s3://mur-sst/zarr/` |
 | HTTPS    | CMIP6   | `https://storage.googleapis.com/cmip6/CMIP6/CMIP/MPI-M/MPI-ESM1-2-LR/historical/r10i1p1f1/day/pr/gn/v20190710` |
+| HTTPS    | NOAA GEFS (v3) | `https://data.dynamical.org/noaa/gefs/analysis/latest.zarr/` |
 
 The GCS and HTTPS tests point at the same underlying dataset via different protocols, which lets us verify that both code paths produce identical results.
 
 The S3 test also exercises the `detect_s3_region()` auto-detection path, since no `AWS_DEFAULT_REGION` env var will be set.
+
+The NOAA GEFS test is the only v3 cloud store test. It exercises v3 consolidated metadata discovery (`zarr.json`), sharding codecs (`sharding_indexed`), and root-level attributes.
 
 ### What to assert
 

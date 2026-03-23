@@ -53,13 +53,18 @@ fn main() -> anyhow::Result<()> {
     let meta = match metadata::fetch_store_meta(&store, &runtime) {
         Ok(meta) => {
             if let Some(sp) = spinner {
-                sp.stop_with_message(&["Fetched .zmetadata"], &palette);
+                let msg = if meta.zarr_format >= 3 {
+                    "Fetched zarr.json"
+                } else {
+                    "Fetched .zmetadata"
+                };
+                sp.stop_with_message(&[msg], &palette);
             }
             meta
         }
         Err(e) => {
             if let Some(sp) = spinner {
-                sp.stop_with_message(&["Error fetching .zmetadata"], &palette);
+                sp.stop_with_message(&["Error fetching metadata"], &palette);
             }
             let mut out = io::stderr();
             let _ = crossterm::execute!(

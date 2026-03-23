@@ -1,0 +1,142 @@
+{
+    "zarr_format": 3,
+    "node_type": "group",
+    "attributes": {
+        "Conventions": "CF-1.8",
+        "title": "Sample v3 Dataset"
+    },
+    "consolidated_metadata": {
+        "kind": "inline",
+        "must_understand": false,
+        "metadata": {
+            "time": {
+                "zarr_format": 3,
+                "node_type": "array",
+                "shape": [24],
+                "data_type": "int64",
+                "chunk_grid": {
+                    "name": "regular",
+                    "configuration": {"chunk_shape": [24]}
+                },
+                "chunk_key_encoding": {
+                    "name": "default",
+                    "configuration": {"separator": "/"}
+                },
+                "codecs": [
+                    {"name": "bytes", "configuration": {"endian": "little"}}
+                ],
+                "fill_value": 0,
+                "dimension_names": ["time"],
+                "attributes": {
+                    "units": "hours since 2020-01-01",
+                    "calendar": "proleptic_gregorian"
+                }
+            },
+            "lat": {
+                "zarr_format": 3,
+                "node_type": "array",
+                "shape": [180],
+                "data_type": "float64",
+                "chunk_grid": {
+                    "name": "regular",
+                    "configuration": {"chunk_shape": [180]}
+                },
+                "chunk_key_encoding": {
+                    "name": "default",
+                    "configuration": {"separator": "/"}
+                },
+                "codecs": [
+                    {"name": "bytes", "configuration": {"endian": "little"}}
+                ],
+                "fill_value": "NaN",
+                "dimension_names": ["lat"],
+                "attributes": {
+                    "units": "degrees_north",
+                    "long_name": "Latitude"
+                }
+            },
+            "lon": {
+                "zarr_format": 3,
+                "node_type": "array",
+                "shape": [360],
+                "data_type": "float64",
+                "chunk_grid": {
+                    "name": "regular",
+                    "configuration": {"chunk_shape": [360]}
+                },
+                "chunk_key_encoding": {
+                    "name": "default",
+                    "configuration": {"separator": "/"}
+                },
+                "codecs": [
+                    {"name": "bytes", "configuration": {"endian": "little"}}
+                ],
+                "fill_value": "NaN",
+                "dimension_names": ["lon"],
+                "attributes": {
+                    "units": "degrees_east",
+                    "long_name": "Longitude"
+                }
+            },
+            "temperature": {
+                "zarr_format": 3,
+                "node_type": "array",
+                "shape": [24, 180, 360],
+                "data_type": "float32",
+                "chunk_grid": {
+                    "name": "regular",
+                    "configuration": {"chunk_shape": [6, 90, 180]}
+                },
+                "chunk_key_encoding": {
+                    "name": "default",
+                    "configuration": {"separator": "/"}
+                },
+                "codecs": [
+                    {"name": "bytes", "configuration": {"endian": "little"}},
+                    {"name": "zstd", "configuration": {"level": 3, "checksum": false}}
+                ],
+                "fill_value": "NaN",
+                "dimension_names": ["time", "lat", "lon"],
+                "attributes": {
+                    "units": "K",
+                    "long_name": "Temperature",
+                    "standard_name": "air_temperature"
+                }
+            },
+            "pressure": {
+                "zarr_format": 3,
+                "node_type": "array",
+                "shape": [24, 180, 360],
+                "data_type": "float32",
+                "chunk_grid": {
+                    "name": "regular",
+                    "configuration": {"chunk_shape": [6, 90, 180]}
+                },
+                "chunk_key_encoding": {
+                    "name": "default",
+                    "configuration": {"separator": "/"}
+                },
+                "codecs": [
+                    {"name": "bytes", "configuration": {"endian": "little"}},
+                    {"name": "blosc", "configuration": {"cname": "zstd", "clevel": 5}}
+                ],
+                "fill_value": "NaN",
+                "dimension_names": ["time", "lat", "lon"],
+                "attributes": {
+                    "units": "Pa",
+                    "long_name": "Surface Pressure"
+                }
+            },
+            "analysis": {
+                "zarr_format": 3,
+                "node_type": "group",
+                "attributes": {"description": "Analysis subgroup"},
+                "consolidated_metadata": {
+                    "kind": "inline",
+                    "must_understand": false,
+                    "metadata": {}
+                }
+            }
+        }
+    }
+}

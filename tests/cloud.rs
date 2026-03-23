@@ -9,6 +9,8 @@ const CMIP6_HTTPS: &str =
 
 const MUR_SST_S3: &str = "s3://mur-sst/zarr/";
 
+const GEFS_HTTPS: &str = "https://data.dynamical.org/noaa/gefs/analysis/latest.zarr/";
+
 fn runtime() -> tokio::runtime::Runtime {
     tokio::runtime::Runtime::new().unwrap()
 }
@@ -62,6 +64,39 @@ fn cloud_https_cmip6() {
     assert!(meta.arrays.iter().any(|a| a.name == "time"));
     assert!(meta.arrays.iter().any(|a| a.name == "lat"));
     assert!(meta.arrays.iter().any(|a| a.name == "lon"));
+}
+
+// --- HTTPS v3 (exercises v3 consolidated metadata + sharding codecs) ---
+
+#[test]
+#[ignore] // requires network
+fn cloud_https_gefs_v3() {
+    let location = StoreLocation::parse(GEFS_HTTPS).unwrap();
+    let runtime = runtime();
+    let meta = parse_store(&location, &runtime).unwrap();
+
+    assert_eq!(meta.zarr_format, 3);
+    assert_eq!(meta.arrays.len(), 26);
+
+    // Coordinates
+    assert!(meta.arrays.iter().any(|a| a.name == "time"));
+    assert!(meta.arrays.iter().any(|a| a.name == "latitude"));
+    assert!(meta.arrays.iter().any(|a| a.name == "longitude"));
+
+    // Representative data variables
+    assert!(meta.arrays.iter().any(|a| a.name == "temperature_2m"));
+    assert!(meta.arrays.iter().any(|a| a.name == "precipitation_surface"));
+    assert!(meta.arrays.iter().any(|a| a.name == "wind_u_10m"));
+    assert!(meta.arrays.iter().any(|a| a.name == "wind_v_10m"));
+    assert!(meta.arrays.iter().any(|a| a.name == "pressure_surface"));
+    assert!(meta.arrays.iter().any(|a| a.name == "geopotential_height_500hpa"));
+
+    // Root attributes are present (non-empty)
+    assert!(!meta.root_attrs.is_empty());
+    assert_eq!(
+        meta.root_attrs["dataset_id"],
+        serde_json::json!("noaa-gefs-analysis")
+    );
 }
 
 /// GCS and HTTPS point at the same dataset — verify they produce identical results.

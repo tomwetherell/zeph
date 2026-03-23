@@ -212,14 +212,13 @@ fn parse_azure_https(input: &str) -> anyhow::Result<StoreLocation> {
 }
 
 fn parse_http(input: &str) -> anyhow::Result<StoreLocation> {
-    let url = url::Url::parse(input)
-        .with_context(|| format!("Invalid URL: {input}"))?;
-    let (store, base_path) = object_store::parse_url(&url)
-        .with_context(|| format!("Could not create HTTP store for {input}"))?;
+    // Use our own reqwest-backed store instead of object_store's HttpStore,
+    // which requires Content-Length in responses (missing from some CDNs).
+    let store = super::reqwest_store::ReqwestHttpStore::new(input);
     Ok(StoreLocation::Cloud {
         url: input.to_string(),
         store: Arc::new(store),
-        base_path,
+        base_path: ObjectPath::from(""),
     })
 }
 

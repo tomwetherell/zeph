@@ -29,9 +29,9 @@ fn render_xarray_style(out: &mut impl Write, location: &StoreLocation, store: &S
     // Build dimension sizes from all arrays
     let mut dim_sizes: BTreeMap<String, usize> = BTreeMap::new();
     for arr in &store.arrays {
-        for (i, dim) in arr.dims.iter().enumerate() {
+        for (i, dim) in arr.display_dims().into_iter().enumerate() {
             if let Some(&size) = arr.shape.get(i) {
-                dim_sizes.entry(dim.clone()).or_insert(size);
+                dim_sizes.entry(dim).or_insert(size);
             }
         }
     }
@@ -75,7 +75,7 @@ fn render_xarray_style(out: &mut impl Write, location: &StoreLocation, store: &S
         .unwrap_or(0);
     let max_dtype = all_arrays
         .iter()
-        .map(|a| friendly_dtype(&a.dtype).len())
+        .map(|a| friendly_dtype(&a.data_type).len())
         .max()
         .unwrap_or(0);
 
@@ -186,7 +186,7 @@ fn render_flat(out: &mut impl Write, location: &StoreLocation, store: &StoreMeta
     );
     for arr in &store.arrays {
         let shape_str = format_shape(&arr.shape);
-        let dtype = friendly_dtype(&arr.dtype);
+        let dtype = friendly_dtype(&arr.data_type);
         let pad = max_name.saturating_sub(arr.name.len()) + 2;
         let _ = crossterm::execute!(
             out,
@@ -201,7 +201,7 @@ fn render_flat(out: &mut impl Write, location: &StoreLocation, store: &StoreMeta
 
 fn print_array_line(out: &mut impl Write, arr: &ArrayMeta, max_name: usize, max_dims: usize, max_dtype: usize, palette: &Palette) {
     let dims_str = format_dims_parens(arr);
-    let dtype = friendly_dtype(&arr.dtype);
+    let dtype = friendly_dtype(&arr.data_type);
     let shape_str = format_shape(&arr.shape);
     let name_pad = max_name.saturating_sub(arr.name.len()) + 2;
     let dims_pad = max_dims.saturating_sub(dims_str.len()) + 2;
@@ -224,7 +224,7 @@ fn format_dims_parens(arr: &ArrayMeta) -> String {
     if arr.dims.is_empty() {
         String::new()
     } else {
-        format!("({})", arr.dims.join(", "))
+        format!("({})", arr.display_dims().join(", "))
     }
 }
 
@@ -236,19 +236,29 @@ fn format_shape(shape: &[usize]) -> String {
         .join(" x ")
 }
 
-pub(crate) fn friendly_dtype(dtype: &str) -> &str {
-    match dtype {
+/// Return a display-friendly data type name.
+///
+/// Since v2 numpy-style dtypes are normalised to v3-style clean names at
+/// parse time, this is now mostly a pass-through.  It still handles any
+/// unexpected legacy values gracefully.
+pub(crate) fn friendly_dtype(data_type: &str) -> &str {
+    match data_type {
+        // v3-style (canonical) ─ pass through
+        "float16" | "float32" | "float64" | "int16" | "int32" | "int64" | "uint8" | "uint16"
+        | "uint32" | "uint64" | "bool" | "string" => data_type,
+        // v2 legacy (in case raw values leak through)
+        "<f2" | ">f2" => "float16",
         "<f4" | ">f4" => "float32",
         "<f8" | ">f8" => "float64",
+        "<i2" | ">i2" => "int16",
         "<i4" | ">i4" => "int32",
         "<i8" | ">i8" => "int64",
-        "<i2" | ">i2" => "int16",
         "<u1" | ">u1" => "uint8",
         "<u2" | ">u2" => "uint16",
         "<u4" | ">u4" => "uint32",
         "<u8" | ">u8" => "uint64",
         "|b1" => "bool",
-        "|S1" => "bytes",
+        "|S1" => "string",
         other => other,
     }
 }
@@ -300,16 +310,17 @@ mod tests {
     use zeph::zarr::metadata::ArrayMeta;
     use std::collections::BTreeMap;
 
-    fn make_array(name: &str, dims: &[&str], shape: &[usize], dtype: &str) -> ArrayMeta {
+    fn make_array(name: &str, dims: &[&str], shape: &[usize], data_type: &str) -> ArrayMeta {
         ArrayMeta {
             name: name.to_string(),
             dims: dims.iter().map(|s| s.to_string()).collect(),
             shape: shape.to_vec(),
-            dtype: dtype.to_string(),
+            data_type: data_type.to_string(),
             attrs: BTreeMap::new(),
             chunks: Vec::new(),
-            compressor: None,
             fill_value: None,
+            codecs: None,
+            compressor: None,
             order: None,
             filters: None,
         }
@@ -352,9 +363,18 @@ mod tests {
     }
 
     #[test]
-    fn friendly_dtype_bool_and_bytes() {
+    fn friendly_dtype_bool_and_string() {
         assert_eq!(friendly_dtype("|b1"), "bool");
-        assert_eq!(friendly_dtype("|S1"), "bytes");
+        assert_eq!(friendly_dtype("|S1"), "string");
+    }
+
+    #[test]
+    fn friendly_dtype_v3_passthrough() {
+        assert_eq!(friendly_dtype("float32"), "float32");
+        assert_eq!(friendly_dtype("float64"), "float64");
+        assert_eq!(friendly_dtype("int64"), "int64");
+        assert_eq!(friendly_dtype("uint8"), "uint8");
+        assert_eq!(friendly_dtype("bool"), "bool");
     }
 
     #[test]
