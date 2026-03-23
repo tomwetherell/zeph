@@ -287,10 +287,7 @@ fn parse_zarr_json(raw: &str) -> anyhow::Result<StoreMeta> {
         bail!("zarr.json has zarr_format {zarr_format}, expected 3");
     }
 
-    let node_type = top
-        .get("node_type")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
+    let node_type = top.get("node_type").and_then(|v| v.as_str()).unwrap_or("");
     if node_type != "group" {
         bail!("Root zarr.json node_type is '{node_type}', expected 'group'");
     }
@@ -330,7 +327,8 @@ fn parse_zarr_json(raw: &str) -> anyhow::Result<StoreMeta> {
 
         let data_type = match node.get("data_type") {
             Some(v) if v.is_string() => v.as_str().unwrap_or("").to_string(),
-            Some(v) if v.is_object() => v.get("name")
+            Some(v) if v.is_object() => v
+                .get("name")
                 .and_then(|n| n.as_str())
                 .unwrap_or("")
                 .to_string(),
@@ -495,10 +493,7 @@ fn parse_zmetadata(raw: &str) -> anyhow::Result<StoreMeta> {
             .and_then(|v| v.as_str())
             .map(String::from);
 
-        let filters = zarray_val
-            .get("filters")
-            .filter(|v| !v.is_null())
-            .cloned();
+        let filters = zarray_val.get("filters").filter(|v| !v.is_null()).cloned();
 
         let mut attrs: BTreeMap<String, Value> = BTreeMap::new();
         let mut dims = Vec::new();
@@ -607,9 +602,8 @@ mod tests {
 
     #[test]
     fn parse_zarr_format() {
-        let json = minimal_zmetadata(
-            r#""temperature/.zarray": { "shape": [365], "dtype": "<f4" }"#,
-        );
+        let json =
+            minimal_zmetadata(r#""temperature/.zarray": { "shape": [365], "dtype": "<f4" }"#);
         let meta = parse_json(&json).unwrap();
         assert_eq!(meta.zarr_format, 2);
     }
@@ -645,9 +639,7 @@ mod tests {
 
     #[test]
     fn parse_root_attrs_empty() {
-        let json = minimal_zmetadata(
-            r#""x/.zarray": { "shape": [5], "dtype": "<f4" }"#,
-        );
+        let json = minimal_zmetadata(r#""x/.zarray": { "shape": [5], "dtype": "<f4" }"#);
         let meta = parse_json(&json).unwrap();
         assert!(meta.root_attrs.is_empty());
     }
@@ -729,9 +721,7 @@ mod tests {
 
     #[test]
     fn parse_no_dimensions() {
-        let json = minimal_zmetadata(
-            r#""data/.zarray": { "shape": [100], "dtype": "<f4" }"#,
-        );
+        let json = minimal_zmetadata(r#""data/.zarray": { "shape": [100], "dtype": "<f4" }"#);
         let meta = parse_json(&json).unwrap();
         assert!(meta.arrays[0].dims.is_empty());
     }
@@ -786,9 +776,7 @@ mod tests {
 
     #[test]
     fn parse_missing_chunks_defaults_empty() {
-        let json = minimal_zmetadata(
-            r#""data/.zarray": { "shape": [100], "dtype": "<f4" }"#,
-        );
+        let json = minimal_zmetadata(r#""data/.zarray": { "shape": [100], "dtype": "<f4" }"#);
         let meta = parse_json(&json).unwrap();
         assert!(meta.arrays[0].chunks.is_empty());
     }
@@ -815,9 +803,7 @@ mod tests {
 
     #[test]
     fn parse_missing_compressor() {
-        let json = minimal_zmetadata(
-            r#""data/.zarray": { "shape": [10], "dtype": "<f4" }"#,
-        );
+        let json = minimal_zmetadata(r#""data/.zarray": { "shape": [10], "dtype": "<f4" }"#);
         let meta = parse_json(&json).unwrap();
         assert!(meta.arrays[0].compressor.is_none());
     }
@@ -851,27 +837,22 @@ mod tests {
 
     #[test]
     fn parse_missing_fill_value() {
-        let json = minimal_zmetadata(
-            r#""data/.zarray": { "shape": [10], "dtype": "<f4" }"#,
-        );
+        let json = minimal_zmetadata(r#""data/.zarray": { "shape": [10], "dtype": "<f4" }"#);
         let meta = parse_json(&json).unwrap();
         assert!(meta.arrays[0].fill_value.is_none());
     }
 
     #[test]
     fn parse_order() {
-        let json = minimal_zmetadata(
-            r#""data/.zarray": { "shape": [10], "dtype": "<f4", "order": "F" }"#,
-        );
+        let json =
+            minimal_zmetadata(r#""data/.zarray": { "shape": [10], "dtype": "<f4", "order": "F" }"#);
         let meta = parse_json(&json).unwrap();
         assert_eq!(meta.arrays[0].order, Some("F".to_string()));
     }
 
     #[test]
     fn parse_missing_order() {
-        let json = minimal_zmetadata(
-            r#""data/.zarray": { "shape": [10], "dtype": "<f4" }"#,
-        );
+        let json = minimal_zmetadata(r#""data/.zarray": { "shape": [10], "dtype": "<f4" }"#);
         let meta = parse_json(&json).unwrap();
         assert!(meta.arrays[0].order.is_none());
     }
@@ -887,9 +868,7 @@ mod tests {
 
     #[test]
     fn parse_missing_filters() {
-        let json = minimal_zmetadata(
-            r#""data/.zarray": { "shape": [10], "dtype": "<f4" }"#,
-        );
+        let json = minimal_zmetadata(r#""data/.zarray": { "shape": [10], "dtype": "<f4" }"#);
         let meta = parse_json(&json).unwrap();
         assert!(meta.arrays[0].filters.is_none());
     }
@@ -898,18 +877,14 @@ mod tests {
 
     #[test]
     fn parse_missing_shape_defaults_empty() {
-        let json = minimal_zmetadata(
-            r#""data/.zarray": { "dtype": "<f4" }"#,
-        );
+        let json = minimal_zmetadata(r#""data/.zarray": { "dtype": "<f4" }"#);
         let meta = parse_json(&json).unwrap();
         assert!(meta.arrays[0].shape.is_empty());
     }
 
     #[test]
     fn parse_missing_dtype_defaults_empty() {
-        let json = minimal_zmetadata(
-            r#""data/.zarray": { "shape": [10] }"#,
-        );
+        let json = minimal_zmetadata(r#""data/.zarray": { "shape": [10] }"#);
         let meta = parse_json(&json).unwrap();
         assert_eq!(meta.arrays[0].data_type, "");
     }
@@ -950,7 +925,8 @@ mod tests {
 
     #[test]
     fn parse_v3_single_array() {
-        let json = minimal_v3(r#"
+        let json = minimal_v3(
+            r#"
             "temperature": {
                 "zarr_format": 3,
                 "node_type": "array",
@@ -962,7 +938,8 @@ mod tests {
                 "dimension_names": ["time", "lat", "lon"],
                 "attributes": {"units": "K"}
             }
-        "#);
+        "#,
+        );
         let meta = parse_zarr_json(&json).unwrap();
         assert_eq!(meta.zarr_format, 3);
         assert_eq!(meta.arrays.len(), 1);
@@ -984,7 +961,8 @@ mod tests {
 
     #[test]
     fn parse_v3_multiple_arrays() {
-        let json = minimal_v3(r#"
+        let json = minimal_v3(
+            r#"
             "temperature": {
                 "zarr_format": 3, "node_type": "array",
                 "shape": [365, 180], "data_type": "float32",
@@ -998,7 +976,8 @@ mod tests {
                 "codecs": [], "fill_value": 0, "dimension_names": ["time"],
                 "attributes": {}
             }
-        "#);
+        "#,
+        );
         let meta = parse_zarr_json(&json).unwrap();
         assert_eq!(meta.arrays.len(), 2);
         let names: Vec<&str> = meta.arrays.iter().map(|a| a.name.as_str()).collect();
@@ -1008,7 +987,8 @@ mod tests {
 
     #[test]
     fn parse_v3_skips_groups() {
-        let json = minimal_v3(r#"
+        let json = minimal_v3(
+            r#"
             "data": {
                 "zarr_format": 3, "node_type": "array",
                 "shape": [10], "data_type": "float32",
@@ -1020,7 +1000,8 @@ mod tests {
                 "attributes": {},
                 "consolidated_metadata": {"kind": "inline", "must_understand": false, "metadata": {}}
             }
-        "#);
+        "#,
+        );
         let meta = parse_zarr_json(&json).unwrap();
         assert_eq!(meta.arrays.len(), 1);
         assert_eq!(meta.arrays[0].name, "data");
@@ -1028,7 +1009,8 @@ mod tests {
 
     #[test]
     fn parse_v3_dimension_names() {
-        let json = minimal_v3(r#"
+        let json = minimal_v3(
+            r#"
             "temp": {
                 "zarr_format": 3, "node_type": "array",
                 "shape": [10, 20], "data_type": "float64",
@@ -1037,14 +1019,16 @@ mod tests {
                 "dimension_names": ["x", "y"],
                 "attributes": {}
             }
-        "#);
+        "#,
+        );
         let meta = parse_zarr_json(&json).unwrap();
         assert_eq!(meta.arrays[0].dims, vec!["x", "y"]);
     }
 
     #[test]
     fn parse_v3_null_dimension_names() {
-        let json = minimal_v3(r#"
+        let json = minimal_v3(
+            r#"
             "temp": {
                 "zarr_format": 3, "node_type": "array",
                 "shape": [10, 20, 30], "data_type": "float64",
@@ -1053,7 +1037,8 @@ mod tests {
                 "dimension_names": ["time", null, "lon"],
                 "attributes": {}
             }
-        "#);
+        "#,
+        );
         let meta = parse_zarr_json(&json).unwrap();
         // Null entries become "" to keep dims.len() == shape.len()
         assert_eq!(meta.arrays[0].dims, vec!["time", "", "lon"]);
@@ -1064,21 +1049,24 @@ mod tests {
 
     #[test]
     fn parse_v3_no_dimension_names() {
-        let json = minimal_v3(r#"
+        let json = minimal_v3(
+            r#"
             "data": {
                 "zarr_format": 3, "node_type": "array",
                 "shape": [10], "data_type": "float32",
                 "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [10]}},
                 "codecs": [], "fill_value": 0, "attributes": {}
             }
-        "#);
+        "#,
+        );
         let meta = parse_zarr_json(&json).unwrap();
         assert!(meta.arrays[0].dims.is_empty());
     }
 
     #[test]
     fn parse_v3_dims_shape_mismatch_clears_dims() {
-        let json = minimal_v3(r#"
+        let json = minimal_v3(
+            r#"
             "data": {
                 "zarr_format": 3, "node_type": "array",
                 "shape": [10, 20, 30], "data_type": "float32",
@@ -1087,7 +1075,8 @@ mod tests {
                 "dimension_names": ["time", "lat"],
                 "attributes": {}
             }
-        "#);
+        "#,
+        );
         let meta = parse_zarr_json(&json).unwrap();
         // Mismatched dims are discarded rather than kept
         assert!(meta.arrays[0].dims.is_empty());
@@ -1119,7 +1108,8 @@ mod tests {
 
     #[test]
     fn parse_v3_codecs_preserved() {
-        let json = minimal_v3(r#"
+        let json = minimal_v3(
+            r#"
             "data": {
                 "zarr_format": 3, "node_type": "array",
                 "shape": [100], "data_type": "float32",
@@ -1130,7 +1120,8 @@ mod tests {
                 ],
                 "fill_value": 0, "attributes": {}
             }
-        "#);
+        "#,
+        );
         let meta = parse_zarr_json(&json).unwrap();
         let codecs = meta.arrays[0].codecs.as_ref().unwrap();
         let arr = codecs.as_array().unwrap();
@@ -1142,13 +1133,15 @@ mod tests {
 
     #[test]
     fn parse_v3_no_arrays_errors() {
-        let json = minimal_v3(r#"
+        let json = minimal_v3(
+            r#"
             "subgroup": {
                 "zarr_format": 3, "node_type": "group",
                 "attributes": {},
                 "consolidated_metadata": {"kind": "inline", "must_understand": false, "metadata": {}}
             }
-        "#);
+        "#,
+        );
         let result = parse_zarr_json(&json);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("No arrays found"));
@@ -1163,33 +1156,40 @@ mod tests {
         }"#;
         let result = parse_zarr_json(json);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("consolidated_metadata"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("consolidated_metadata"));
     }
 
     #[test]
     fn parse_v3_non_regular_chunk_grid() {
-        let json = minimal_v3(r#"
+        let json = minimal_v3(
+            r#"
             "data": {
                 "zarr_format": 3, "node_type": "array",
                 "shape": [100], "data_type": "float32",
                 "chunk_grid": {"name": "rectangular", "configuration": {}},
                 "codecs": [], "fill_value": 0, "attributes": {}
             }
-        "#);
+        "#,
+        );
         let meta = parse_zarr_json(&json).unwrap();
         assert!(meta.arrays[0].chunks.is_empty());
     }
 
     #[test]
     fn parse_v3_object_data_type() {
-        let json = minimal_v3(r#"
+        let json = minimal_v3(
+            r#"
             "timestamps": {
                 "zarr_format": 3, "node_type": "array",
                 "shape": [100], "data_type": {"name": "numpy.datetime64", "configuration": {"unit": "ns", "scale_factor": 1}},
                 "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [100]}},
                 "codecs": [], "fill_value": 0, "attributes": {}
             }
-        "#);
+        "#,
+        );
         let meta = parse_zarr_json(&json).unwrap();
         assert_eq!(meta.arrays[0].data_type, "numpy.datetime64");
     }
@@ -1217,11 +1217,7 @@ mod tests {
     fn fetch_v2_store_without_consolidated_metadata() {
         let dir = tempfile::tempdir().unwrap();
         // v2 store root has .zgroup but no .zmetadata
-        std::fs::write(
-            dir.path().join(".zgroup"),
-            r#"{"zarr_format": 2}"#,
-        )
-        .unwrap();
+        std::fs::write(dir.path().join(".zgroup"), r#"{"zarr_format": 2}"#).unwrap();
         let location = StoreLocation::Local(dir.path().to_path_buf());
         let runtime = tokio::runtime::Runtime::new().unwrap();
         let result = fetch_store_meta(&location, &runtime);
@@ -1238,9 +1234,7 @@ mod tests {
     #[test]
     fn fetch_valid_store_returns_meta() {
         let dir = tempfile::tempdir().unwrap();
-        let json = minimal_zmetadata(
-            r#""data/.zarray": { "shape": [10], "dtype": "<f4" }"#,
-        );
+        let json = minimal_zmetadata(r#""data/.zarray": { "shape": [10], "dtype": "<f4" }"#);
         std::fs::write(dir.path().join(".zmetadata"), json).unwrap();
         let location = StoreLocation::Local(dir.path().to_path_buf());
         let runtime = tokio::runtime::Runtime::new().unwrap();
@@ -1252,14 +1246,16 @@ mod tests {
     #[test]
     fn fetch_v3_store_returns_meta() {
         let dir = tempfile::tempdir().unwrap();
-        let json = minimal_v3(r#"
+        let json = minimal_v3(
+            r#"
             "data": {
                 "zarr_format": 3, "node_type": "array",
                 "shape": [10], "data_type": "float32",
                 "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [10]}},
                 "codecs": [], "fill_value": 0, "attributes": {}
             }
-        "#);
+        "#,
+        );
         std::fs::write(dir.path().join("zarr.json"), json).unwrap();
         let location = StoreLocation::Local(dir.path().to_path_buf());
         let runtime = tokio::runtime::Runtime::new().unwrap();
@@ -1273,17 +1269,17 @@ mod tests {
     fn fetch_prefers_v3_over_v2() {
         let dir = tempfile::tempdir().unwrap();
         // Write both zarr.json (v3) and .zmetadata (v2)
-        let v3_json = minimal_v3(r#"
+        let v3_json = minimal_v3(
+            r#"
             "v3data": {
                 "zarr_format": 3, "node_type": "array",
                 "shape": [10], "data_type": "float32",
                 "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [10]}},
                 "codecs": [], "fill_value": 0, "attributes": {}
             }
-        "#);
-        let v2_json = minimal_zmetadata(
-            r#""v2data/.zarray": { "shape": [10], "dtype": "<f4" }"#,
+        "#,
         );
+        let v2_json = minimal_zmetadata(r#""v2data/.zarray": { "shape": [10], "dtype": "<f4" }"#);
         std::fs::write(dir.path().join("zarr.json"), v3_json).unwrap();
         std::fs::write(dir.path().join(".zmetadata"), v2_json).unwrap();
         let location = StoreLocation::Local(dir.path().to_path_buf());

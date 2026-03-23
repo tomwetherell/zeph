@@ -44,8 +44,7 @@ impl StoreLocation {
 }
 
 fn parse_gcs(input: &str) -> anyhow::Result<StoreLocation> {
-    let url = url::Url::parse(input)
-        .with_context(|| format!("Invalid URL: {input}"))?;
+    let url = url::Url::parse(input).with_context(|| format!("Invalid URL: {input}"))?;
     let bucket = url.host_str().context("Missing bucket name in GCS URL")?;
     let path = url.path().trim_start_matches('/');
 
@@ -54,12 +53,13 @@ fn parse_gcs(input: &str) -> anyhow::Result<StoreLocation> {
         || std::env::var("GOOGLE_APPLICATION_CREDENTIALS").is_ok()
         || default_gcp_creds_exist();
 
-    let mut builder = object_store::gcp::GoogleCloudStorageBuilder::from_env()
-        .with_bucket_name(bucket);
+    let mut builder =
+        object_store::gcp::GoogleCloudStorageBuilder::from_env().with_bucket_name(bucket);
     if !has_creds {
         builder = builder.with_skip_signature(true);
     }
-    let store = builder.build()
+    let store = builder
+        .build()
         .with_context(|| format!("Could not create GCS store for {input}"))?;
 
     Ok(StoreLocation::Cloud {
@@ -70,8 +70,7 @@ fn parse_gcs(input: &str) -> anyhow::Result<StoreLocation> {
 }
 
 fn parse_s3(input: &str) -> anyhow::Result<StoreLocation> {
-    let url = url::Url::parse(input)
-        .with_context(|| format!("Invalid URL: {input}"))?;
+    let url = url::Url::parse(input).with_context(|| format!("Invalid URL: {input}"))?;
     let bucket = url.host_str().context("Missing bucket name in S3 URL")?;
     let path = url.path().trim_start_matches('/');
 
@@ -89,7 +88,8 @@ fn parse_s3(input: &str) -> anyhow::Result<StoreLocation> {
     if !has_creds {
         builder = builder.with_skip_signature(true);
     }
-    let store = builder.build()
+    let store = builder
+        .build()
         .with_context(|| format!("Could not create S3 store for {input}"))?;
 
     Ok(StoreLocation::Cloud {
@@ -113,12 +113,14 @@ fn detect_s3_region(bucket: &str) -> Option<String> {
     drop(stream);
 
     stream = TcpStream::connect((&*host, 80_u16)).ok()?;
-    stream.set_read_timeout(Some(std::time::Duration::from_secs(5))).ok()?;
-    stream.set_write_timeout(Some(std::time::Duration::from_secs(5))).ok()?;
+    stream
+        .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+        .ok()?;
+    stream
+        .set_write_timeout(Some(std::time::Duration::from_secs(5)))
+        .ok()?;
 
-    let request = format!(
-        "HEAD / HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n\r\n"
-    );
+    let request = format!("HEAD / HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n\r\n");
     stream.write_all(request.as_bytes()).ok()?;
 
     let reader = BufReader::new(stream);
@@ -135,16 +137,16 @@ fn detect_s3_region(bucket: &str) -> Option<String> {
 }
 
 fn parse_azure(input: &str) -> anyhow::Result<StoreLocation> {
-    let url = url::Url::parse(input)
-        .with_context(|| format!("Invalid URL: {input}"))?;
-    let container = url.host_str().context("Missing container name in Azure URL")?;
+    let url = url::Url::parse(input).with_context(|| format!("Invalid URL: {input}"))?;
+    let container = url
+        .host_str()
+        .context("Missing container name in Azure URL")?;
     let path = url.path().trim_start_matches('/');
 
-    let account = std::env::var("AZURE_STORAGE_ACCOUNT_NAME")
-        .with_context(|| {
-            "az:// URLs require the AZURE_STORAGE_ACCOUNT_NAME environment variable \
+    let account = std::env::var("AZURE_STORAGE_ACCOUNT_NAME").with_context(|| {
+        "az:// URLs require the AZURE_STORAGE_ACCOUNT_NAME environment variable \
              (Azure container names are not globally unique, unlike S3/GCS buckets)"
-        })?;
+    })?;
 
     let has_creds = std::env::var("AZURE_STORAGE_ACCOUNT_KEY").is_ok()
         || std::env::var("AZURE_STORAGE_ACCESS_KEY").is_ok()
@@ -156,7 +158,8 @@ fn parse_azure(input: &str) -> anyhow::Result<StoreLocation> {
     if !has_creds {
         builder = builder.with_skip_signature(true);
     }
-    let store = builder.build()
+    let store = builder
+        .build()
         .with_context(|| format!("Could not create Azure store for {input}"))?;
 
     Ok(StoreLocation::Cloud {
@@ -179,8 +182,7 @@ fn is_azure_https(input: &str) -> bool {
 /// Parse an Azure Blob Storage HTTPS URL like:
 /// https://<account>.blob.core.windows.net/<container>/<path>
 fn parse_azure_https(input: &str) -> anyhow::Result<StoreLocation> {
-    let url = url::Url::parse(input)
-        .with_context(|| format!("Invalid URL: {input}"))?;
+    let url = url::Url::parse(input).with_context(|| format!("Invalid URL: {input}"))?;
     let host = url.host_str().context("Missing host in Azure HTTPS URL")?;
     let account = host
         .strip_suffix(".blob.core.windows.net")
@@ -201,7 +203,8 @@ fn parse_azure_https(input: &str) -> anyhow::Result<StoreLocation> {
     if !has_creds {
         builder = builder.with_skip_signature(true);
     }
-    let store = builder.build()
+    let store = builder
+        .build()
         .with_context(|| format!("Could not create Azure store for {input}"))?;
 
     Ok(StoreLocation::Cloud {
@@ -330,17 +333,14 @@ mod tests {
 
     #[test]
     fn parse_https_url_returns_cloud() {
-        let loc = StoreLocation::parse(
-            "https://storage.googleapis.com/cmip6/CMIP6/data"
-        ).unwrap();
+        let loc = StoreLocation::parse("https://storage.googleapis.com/cmip6/CMIP6/data").unwrap();
         assert!(matches!(loc, StoreLocation::Cloud { .. }));
     }
 
     #[test]
     fn parse_azure_https_url_returns_cloud() {
-        let loc = StoreLocation::parse(
-            "https://myaccount.blob.core.windows.net/container/path"
-        ).unwrap();
+        let loc =
+            StoreLocation::parse("https://myaccount.blob.core.windows.net/container/path").unwrap();
         assert!(matches!(loc, StoreLocation::Cloud { .. }));
     }
 

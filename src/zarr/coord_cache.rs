@@ -116,27 +116,19 @@ async fn fetch_one(
 
     match data_type {
         "float32" | "<f4" | ">f4" => {
-            let data: Vec<f32> = array
-                .async_retrieve_array_subset::<Vec<_>>(&subset)
-                .await?;
+            let data: Vec<f32> = array.async_retrieve_array_subset::<Vec<_>>(&subset).await?;
             Ok(CoordValues::Float32(data))
         }
         "float64" | "<f8" | ">f8" => {
-            let data: Vec<f64> = array
-                .async_retrieve_array_subset::<Vec<_>>(&subset)
-                .await?;
+            let data: Vec<f64> = array.async_retrieve_array_subset::<Vec<_>>(&subset).await?;
             Ok(CoordValues::Float64(data))
         }
         "int32" | "<i4" | ">i4" => {
-            let data: Vec<i32> = array
-                .async_retrieve_array_subset::<Vec<_>>(&subset)
-                .await?;
+            let data: Vec<i32> = array.async_retrieve_array_subset::<Vec<_>>(&subset).await?;
             Ok(CoordValues::Int32(data))
         }
         "int64" | "<i8" | ">i8" => {
-            let data: Vec<i64> = array
-                .async_retrieve_array_subset::<Vec<_>>(&subset)
-                .await?;
+            let data: Vec<i64> = array.async_retrieve_array_subset::<Vec<_>>(&subset).await?;
             Ok(CoordValues::Int64(data))
         }
         other => anyhow::bail!("Unsupported coordinate data type: {other}"),
@@ -149,9 +141,7 @@ impl CoordValues {
     /// Format as "first, first, first, ..., last, last, last".
     pub fn format_summary(&self, head: usize, tail: usize) -> String {
         match self {
-            CoordValues::Float32(v) => {
-                fmt_slice_with(v, head, tail, |v| fmt_float(*v as f64))
-            }
+            CoordValues::Float32(v) => fmt_slice_with(v, head, tail, |v| fmt_float(*v as f64)),
             CoordValues::Float64(v) => fmt_slice_with(v, head, tail, |v| fmt_float(*v)),
             CoordValues::Int32(v) => fmt_slice(v, head, tail),
             CoordValues::Int64(v) => fmt_slice(v, head, tail),
@@ -179,7 +169,12 @@ fn fmt_slice<T: std::fmt::Display>(values: &[T], head: usize, tail: usize) -> St
     fmt_slice_with(values, head, tail, |v| v.to_string())
 }
 
-fn fmt_slice_with<T, F: Fn(&T) -> String>(values: &[T], head: usize, tail: usize, to_str: F) -> String {
+fn fmt_slice_with<T, F: Fn(&T) -> String>(
+    values: &[T],
+    head: usize,
+    tail: usize,
+    to_str: F,
+) -> String {
     let len = values.len();
     if len <= head + tail {
         values
@@ -359,7 +354,10 @@ mod tests {
         let decoded = try_decode_cf_time(values, &attrs);
         match decoded {
             CoordValues::Datetime(dt) => {
-                assert_eq!(dt, vec!["1900-01-01", "1900-01-01T06:00:00", "1900-01-01T12:00:00"]);
+                assert_eq!(
+                    dt,
+                    vec!["1900-01-01", "1900-01-01T06:00:00", "1900-01-01T12:00:00"]
+                );
             }
             other => panic!("Expected Datetime, got {:?}", other),
         }
@@ -385,7 +383,10 @@ mod tests {
         let decoded = try_decode_cf_time(values, &attrs);
         match decoded {
             CoordValues::Datetime(dt) => {
-                assert_eq!(dt, vec!["2020-01-01", "2020-01-01T01:00:00", "2020-01-01T02:00:00"]);
+                assert_eq!(
+                    dt,
+                    vec!["2020-01-01", "2020-01-01T01:00:00", "2020-01-01T02:00:00"]
+                );
             }
             other => panic!("Expected Datetime, got {:?}", other),
         }

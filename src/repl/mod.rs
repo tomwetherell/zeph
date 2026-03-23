@@ -16,9 +16,9 @@ pub fn run(ctx: &Ctx) -> anyhow::Result<()> {
         match input::read_input(&commands, &ctx.palette, &mut history)? {
             input::Input::Command(name) => {
                 history.push(name.clone());
-                let cmd = commands.iter().find(|c| {
-                    c.name == name || c.aliases.contains(&name.as_str())
-                });
+                let cmd = commands
+                    .iter()
+                    .find(|c| c.name == name || c.aliases.contains(&name.as_str()));
                 let result = match cmd {
                     Some(c) => match &c.handler {
                         Handler::Immediate(f) => f(ctx),

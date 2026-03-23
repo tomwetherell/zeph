@@ -5,7 +5,6 @@
 //! transfer encoding.  This store avoids that limitation by collecting the
 //! full response body and deriving the size from the bytes received.
 
-use std::fmt;
 use async_trait::async_trait;
 use bytes::Bytes;
 use chrono::Utc;
@@ -15,6 +14,7 @@ use object_store::{
     Attributes, GetOptions, GetResult, GetResultPayload, ListResult, MultipartUpload, ObjectMeta,
     ObjectStore, PutMultipartOptions, PutOptions, PutPayload, PutResult, Result,
 };
+use std::fmt;
 
 #[derive(Debug)]
 pub struct ReqwestHttpStore {
@@ -43,15 +43,15 @@ impl ReqwestHttpStore {
     /// GET the full body at `location`, returning the bytes and HTTP status.
     async fn fetch(&self, location: &Path) -> Result<Bytes> {
         let url = self.url(location);
-        let response = self
-            .client
-            .get(&url)
-            .send()
-            .await
-            .map_err(|e| object_store::Error::Generic {
-                store: "ReqwestHTTP",
-                source: Box::new(e),
-            })?;
+        let response =
+            self.client
+                .get(&url)
+                .send()
+                .await
+                .map_err(|e| object_store::Error::Generic {
+                    store: "ReqwestHTTP",
+                    source: Box::new(e),
+                })?;
 
         let status = response.status();
         if status == reqwest::StatusCode::NOT_FOUND {
@@ -102,12 +102,13 @@ impl ObjectStore for ReqwestHttpStore {
         // Apply byte range if requested.
         let (bytes, range) = match options.range {
             Some(get_range) => {
-                let r = get_range.as_range(total_size).map_err(|e| {
-                    object_store::Error::Generic {
-                        store: "ReqwestHTTP",
-                        source: Box::new(e),
-                    }
-                })?;
+                let r =
+                    get_range
+                        .as_range(total_size)
+                        .map_err(|e| object_store::Error::Generic {
+                            store: "ReqwestHTTP",
+                            source: Box::new(e),
+                        })?;
                 let sliced = bytes.slice(r.start as usize..r.end as usize);
                 (sliced, r)
             }

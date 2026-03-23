@@ -4,7 +4,7 @@ use std::path::Path;
 
 use crossterm::style::{Print, ResetColor, SetForegroundColor};
 
-use super::{CommandResult, CommandAction, Ctx};
+use super::{CommandAction, CommandResult, Ctx};
 use crate::ui::style::Palette;
 use zeph::zarr::metadata::{ArrayMeta, StoreMeta};
 use zeph::zarr::store::StoreLocation;
@@ -25,7 +25,12 @@ pub fn run(ctx: &Ctx) -> CommandResult {
     }
 }
 
-fn render_xarray_style(out: &mut impl Write, location: &StoreLocation, store: &StoreMeta, palette: &Palette) {
+fn render_xarray_style(
+    out: &mut impl Write,
+    location: &StoreLocation,
+    store: &StoreMeta,
+    palette: &Palette,
+) {
     // Build dimension sizes from all arrays
     let mut dim_sizes: BTreeMap<String, usize> = BTreeMap::new();
     for arr in &store.arrays {
@@ -102,10 +107,7 @@ fn render_xarray_style(out: &mut impl Write, location: &StoreLocation, store: &S
         Print("  Dimensions:  "),
         ResetColor,
     );
-    let dims_str: Vec<String> = dim_sizes
-        .iter()
-        .map(|(k, v)| format!("{k}: {v}"))
-        .collect();
+    let dims_str: Vec<String> = dim_sizes.iter().map(|(k, v)| format!("{k}: {v}")).collect();
     let _ = write!(out, "{}\n", dims_str.join(", "));
 
     // Coordinates
@@ -162,7 +164,12 @@ fn render_xarray_style(out: &mut impl Write, location: &StoreLocation, store: &S
     let _ = writeln!(out);
 }
 
-fn render_flat(out: &mut impl Write, location: &StoreLocation, store: &StoreMeta, palette: &Palette) {
+fn render_flat(
+    out: &mut impl Write,
+    location: &StoreLocation,
+    store: &StoreMeta,
+    palette: &Palette,
+) {
     let display_path = location.display_path();
     let size_str = store_size_str(location);
     let _ = crossterm::execute!(out, Print("\n"));
@@ -199,7 +206,14 @@ fn render_flat(out: &mut impl Write, location: &StoreLocation, store: &StoreMeta
     let _ = writeln!(out);
 }
 
-fn print_array_line(out: &mut impl Write, arr: &ArrayMeta, max_name: usize, max_dims: usize, max_dtype: usize, palette: &Palette) {
+fn print_array_line(
+    out: &mut impl Write,
+    arr: &ArrayMeta,
+    max_name: usize,
+    max_dims: usize,
+    max_dtype: usize,
+    palette: &Palette,
+) {
     let dims_str = format_dims_parens(arr);
     let dtype = friendly_dtype(&arr.data_type);
     let shape_str = format_shape(&arr.shape);
@@ -307,8 +321,8 @@ fn dir_size_bytes(path: &Path) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use zeph::zarr::metadata::ArrayMeta;
     use std::collections::BTreeMap;
+    use zeph::zarr::metadata::ArrayMeta;
 
     fn make_array(name: &str, dims: &[&str], shape: &[usize], data_type: &str) -> ArrayMeta {
         ArrayMeta {

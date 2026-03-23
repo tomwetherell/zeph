@@ -38,7 +38,9 @@ pub fn run(buffer: &mut String, commands: &[Command], palette: &Palette) -> anyh
             .filter_map(|c| {
                 if c.name.starts_with(buffer.as_str()) {
                     Some((c, None))
-                } else if let Some(alias) = c.aliases.iter().find(|a| a.starts_with(buffer.as_str())) {
+                } else if let Some(alias) =
+                    c.aliases.iter().find(|a| a.starts_with(buffer.as_str()))
+                {
                     Some((c, Some(*alias)))
                 } else {
                     None
@@ -140,7 +142,13 @@ pub fn run(buffer: &mut String, commands: &[Command], palette: &Palette) -> anyh
 /// Draw the menu, overwriting any previous content in place.
 /// Clears each line before writing to handle shrinking content,
 /// and clears leftover lines when the item count decreases.
-fn draw_menu(out: &mut impl Write, items: &[(&Command, Option<&str>)], selected: usize, prev_count: usize, palette: &Palette) -> anyhow::Result<()> {
+fn draw_menu(
+    out: &mut impl Write,
+    items: &[(&Command, Option<&str>)],
+    selected: usize,
+    prev_count: usize,
+    palette: &Palette,
+) -> anyhow::Result<()> {
     crossterm::queue!(out, cursor::SavePosition)?;
 
     // Skip past the bottom divider line
@@ -183,11 +191,7 @@ fn draw_menu(out: &mut impl Write, items: &[(&Command, Option<&str>)], selected:
                 Print(&display_name),
             )?;
             write!(out, "{}", " ".repeat(name_pad))?;
-            crossterm::queue!(
-                out,
-                Print(cmd.description),
-                ResetColor,
-            )?;
+            crossterm::queue!(out, Print(cmd.description), ResetColor,)?;
         }
     }
 

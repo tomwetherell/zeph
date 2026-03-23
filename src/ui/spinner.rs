@@ -50,7 +50,9 @@ impl Spinner {
                 // Truncate to terminal width to prevent line wrapping, which
                 // breaks the \r-based animation (CR only returns to the start
                 // of the last *physical* line).
-                let width = crossterm::terminal::size().map(|(w, _)| w as usize).unwrap_or(80);
+                let width = crossterm::terminal::size()
+                    .map(|(w, _)| w as usize)
+                    .unwrap_or(80);
                 let truncated_suffix = if prefix_cols + suffix_cols > width {
                     suffix.map(|s| {
                         let avail = width.saturating_sub(prefix_cols).saturating_sub(1);
@@ -77,11 +79,7 @@ impl Spinner {
                 );
                 if let Some(ref s) = truncated_suffix {
                     if !s.is_empty() {
-                        let _ = crossterm::execute!(
-                            out,
-                            SetForegroundColor(dim_dark),
-                            Print(s),
-                        );
+                        let _ = crossterm::execute!(out, SetForegroundColor(dim_dark), Print(s),);
                     }
                 }
                 let _ = crossterm::execute!(out, ResetColor);
@@ -128,7 +126,6 @@ impl Spinner {
         }
         let _ = out.flush();
     }
-
 }
 
 impl Drop for Spinner {

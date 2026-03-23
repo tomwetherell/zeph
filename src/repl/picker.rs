@@ -60,9 +60,7 @@ pub fn run(arrays: &[ArrayMeta], palette: &Palette) -> anyhow::Result<Option<usi
         let filtered: Vec<(usize, &ArrayMeta)> = arrays
             .iter()
             .enumerate()
-            .filter(|(_, a)| {
-                filter.is_empty() || a.name.contains(filter.as_str())
-            })
+            .filter(|(_, a)| filter.is_empty() || a.name.contains(filter.as_str()))
             .collect();
 
         if selected >= filtered.len() {
@@ -71,7 +69,15 @@ pub fn run(arrays: &[ArrayMeta], palette: &Palette) -> anyhow::Result<Option<usi
 
         viewport_start = compute_viewport(selected, viewport_start, filtered.len(), WINDOW_SIZE);
 
-        prev_lines = draw_picker(&mut out, &filtered, selected, viewport_start, WINDOW_SIZE, prev_lines, palette)?;
+        prev_lines = draw_picker(
+            &mut out,
+            &filtered,
+            selected,
+            viewport_start,
+            WINDOW_SIZE,
+            prev_lines,
+            palette,
+        )?;
 
         if let Event::Key(key) = event::read()? {
             match (key.code, key.modifiers) {
@@ -85,11 +91,7 @@ pub fn run(arrays: &[ArrayMeta], palette: &Palette) -> anyhow::Result<Option<usi
                     if let Some(&(orig_idx, _)) = filtered.get(selected) {
                         clear_picker(&mut out, prev_lines)?;
                         // Clear the prompt line
-                        crossterm::execute!(
-                            out,
-                            Print("\r"),
-                            Clear(ClearType::CurrentLine),
-                        )?;
+                        crossterm::execute!(out, Print("\r"), Clear(ClearType::CurrentLine),)?;
                         return Ok(Some(orig_idx));
                     }
                     // No matches — ignore enter

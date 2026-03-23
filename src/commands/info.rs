@@ -4,8 +4,8 @@ use std::time::Duration;
 use crossterm::style::{Print, ResetColor, SetForegroundColor};
 use serde_json::Value;
 
-use super::{CommandAction, CommandResult, Ctx};
 use super::summary::{format_bytes, friendly_dtype};
+use super::{CommandAction, CommandResult, Ctx};
 use zeph::zarr::coord_cache::CoordEntry;
 use zeph::zarr::metadata::ArrayMeta;
 
@@ -110,8 +110,7 @@ pub fn run(ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
             // --- Sharded: array.chunks are shard shapes ---
             let _ = crossterm::execute!(out, Print("\n"));
 
-            let shard_tuple: Vec<String> =
-                array.chunks.iter().map(|c| c.to_string()).collect();
+            let shard_tuple: Vec<String> = array.chunks.iter().map(|c| c.to_string()).collect();
             let _ = crossterm::execute!(
                 out,
                 SetForegroundColor(ctx.palette.heading),
@@ -174,8 +173,7 @@ pub fn run(ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
             if !inner_chunks.is_empty() {
                 let _ = crossterm::execute!(out, Print("\n"));
 
-                let chunk_tuple: Vec<String> =
-                    inner_chunks.iter().map(|c| c.to_string()).collect();
+                let chunk_tuple: Vec<String> = inner_chunks.iter().map(|c| c.to_string()).collect();
                 let _ = crossterm::execute!(
                     out,
                     SetForegroundColor(ctx.palette.heading),
@@ -232,8 +230,7 @@ pub fn run(ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
             // --- Non-sharded: original display ---
             let _ = crossterm::execute!(out, Print("\n"));
 
-            let chunk_tuple: Vec<String> =
-                array.chunks.iter().map(|c| c.to_string()).collect();
+            let chunk_tuple: Vec<String> = array.chunks.iter().map(|c| c.to_string()).collect();
             let _ = crossterm::execute!(
                 out,
                 SetForegroundColor(ctx.palette.heading),
@@ -330,13 +327,19 @@ pub fn run(ctx: &Ctx, array: &ArrayMeta) -> CommandResult {
             })
             .collect();
 
-        let max_name = rows.iter().map(|(a, _, _, _)| a.name.len()).max().unwrap_or(0);
+        let max_name = rows
+            .iter()
+            .map(|(a, _, _, _)| a.name.len())
+            .max()
+            .unwrap_or(0);
         let max_size = rows.iter().map(|(_, s, _, _)| s.len()).max().unwrap_or(0);
         let max_dtype = rows.iter().map(|(_, _, d, _)| d.len()).max().unwrap_or(0);
 
         // Column where values start: "      " + max_name + 2 + max_size + "  " + max_dtype + "   "
         let values_col = 6 + max_name + 2 + max_size + 2 + max_dtype + 3;
-        let term_width = crossterm::terminal::size().map(|(w, _)| w as usize).unwrap_or(80);
+        let term_width = crossterm::terminal::size()
+            .map(|(w, _)| w as usize)
+            .unwrap_or(80);
 
         for (coord_arr, size_str, dtype, values_str) in &rows {
             let name_pad = max_name.saturating_sub(coord_arr.name.len()) + 2;
@@ -427,10 +430,7 @@ fn format_compressor(compressor: &Option<Value>) -> String {
     match compressor {
         None => "none".to_string(),
         Some(val) => {
-            let id = val
-                .get("id")
-                .and_then(|v| v.as_str())
-                .unwrap_or("unknown");
+            let id = val.get("id").and_then(|v| v.as_str()).unwrap_or("unknown");
             match id {
                 "blosc" => {
                     let cname = val.get("cname").and_then(|v| v.as_str()).unwrap_or("?");

@@ -52,10 +52,20 @@ fn confirm_prompt(out: &mut impl Write, buffer: &str, palette: &Palette) -> anyh
     let (term_width, _) = terminal::size().unwrap_or((80, 24));
 
     // Move up to top divider and clear it
-    crossterm::execute!(out, cursor::MoveUp(1), Print("\r"), Clear(ClearType::CurrentLine))?;
+    crossterm::execute!(
+        out,
+        cursor::MoveUp(1),
+        Print("\r"),
+        Clear(ClearType::CurrentLine)
+    )?;
 
     // Move down to input line, clear and rewrite with gray background
-    crossterm::execute!(out, cursor::MoveDown(1), Print("\r"), Clear(ClearType::CurrentLine))?;
+    crossterm::execute!(
+        out,
+        cursor::MoveDown(1),
+        Print("\r"),
+        Clear(ClearType::CurrentLine)
+    )?;
     let cmd_text = format!(" {buffer}");
     let arrow_pad = 1; // "❯" is 1 char wide
     let pad = (term_width as usize).saturating_sub(arrow_pad + cmd_text.chars().count());
@@ -91,7 +101,11 @@ fn replace_buffer(out: &mut impl Write, buffer: &mut String, new: &str) -> anyho
     Ok(())
 }
 
-pub fn read_input(commands: &[Command], palette: &Palette, history: &mut History) -> anyhow::Result<Input> {
+pub fn read_input(
+    commands: &[Command],
+    palette: &Palette,
+    history: &mut History,
+) -> anyhow::Result<Input> {
     let mut out = io::stdout();
 
     // Print divider above prompt
