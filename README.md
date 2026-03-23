@@ -9,7 +9,7 @@ An interactive CLI tool to quickly and easily inspect zarr stores. Supports loca
 ### Install prebuilt binaries via shell script
 
 ```
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/tomwetherell/zeph/releases/download/v0.2.0/zeph-installer.sh | sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/tomwetherell/zeph/releases/download/v0.3.0/zeph-installer.sh | sh
 ```
 
 ### Quickstart 
