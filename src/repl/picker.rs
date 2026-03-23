@@ -189,6 +189,7 @@ fn draw_picker(
         }
 
         // Visible items
+        #[allow(clippy::needless_range_loop)]
         for i in viewport_start..viewport_end {
             let (_, arr) = &items[i];
             crossterm::queue!(out, Print("\n\r"), Clear(ClearType::CurrentLine))?;

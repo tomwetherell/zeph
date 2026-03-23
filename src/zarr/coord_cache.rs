@@ -118,6 +118,7 @@ async fn fetch_one(
     let array = Array::async_open(store.clone(), path).await?;
     let shape = array.shape();
     let len = *shape.first().context("coordinate array has empty shape")?;
+    #[allow(clippy::single_range_in_vec_init)]
     let subset = ArraySubset::new_with_ranges(&[0..len]);
 
     match data_type {
