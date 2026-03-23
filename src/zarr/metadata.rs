@@ -36,6 +36,13 @@ pub struct ArrayMeta {
 impl ArrayMeta {
     /// A coordinate array is one-dimensional and its single dimension
     /// name matches the array name (xarray convention).
+    ///
+    /// NOTE: For stores with nested groups (e.g. `group1/time`), `name`
+    /// is the full path while `dims[0]` is the leaf name (`"time"`), so
+    /// this check will not recognise nested coordinate arrays. Downstream
+    /// lookups in info.rs and summary.rs also compare `a.name` against
+    /// dimension names and would need similar treatment. Flat stores
+    /// (the common case) are unaffected.
     pub fn is_coordinate(&self) -> bool {
         self.dims.len() == 1 && self.dims[0] == self.name
     }
@@ -373,6 +380,9 @@ fn parse_zarr_json(raw: &str) -> anyhow::Result<StoreMeta> {
             .map(|m| m.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
             .unwrap_or_default();
 
+        // `name` is the full consolidated-metadata key, which includes
+        // the group path for nested arrays (e.g. "group1/temperature").
+        // See is_coordinate() for a known limitation this causes.
         arrays.push(ArrayMeta {
             name: name.clone(),
             shape,
