@@ -109,10 +109,23 @@ pub fn fetch_store_meta(
     // Try zarr.json first (v3)
     match fetch_raw_file(location, runtime, "zarr.json") {
         Ok(raw) => {
-            if let Ok(meta) = parse_zarr_json(&raw) {
-                return Ok(meta);
+            match parse_zarr_json(&raw) {
+                Ok(meta) => return Ok(meta),
+                Err(e) => {
+                    // If the zarr.json declares zarr_format >= 3, this is a v3
+                    // store — don't silently fall through to .zmetadata.
+                    if is_v3_json(&raw) {
+                        return Err(FetchError::NoConsolidatedMetadata(format!(
+                            "Found zarr.json (v3) in {} but failed to read consolidated metadata:\n\
+                             {e:#}\n\n\
+                             Zeph requires consolidated metadata.\n\
+                             See https://zarr.readthedocs.io/en/latest/user-guide/consolidated_metadata/",
+                            location.display_path(),
+                        )));
+                    }
+                    // Not a v3 store (zarr_format < 3 or unparseable) — fall through to .zmetadata
+                }
             }
-            // Not v3 consolidated metadata — fall through to .zmetadata
         }
         Err(FetchError::NotFound(_) | FetchError::NoConsolidatedMetadata(_)) => {
             // zarr.json not found — try .zmetadata
@@ -127,12 +140,22 @@ pub fn fetch_store_meta(
     match fetch_raw_file(location, runtime, ".zmetadata") {
         Ok(raw) => parse_zmetadata(&raw).map_err(FetchError::Other),
         Err(FetchError::NotFound(_) | FetchError::NoConsolidatedMetadata(_)) => {
-            Err(FetchError::NoConsolidatedMetadata(format!(
-                "No consolidated metadata found in {}\n\
-                 Zeph requires consolidated metadata (zarr.json for v3, .zmetadata for v2).\n\
-                 See https://zarr.readthedocs.io/en/latest/user-guide/consolidated_metadata/",
-                location.display_path(),
-            )))
+            // Distinguish "v2 store without consolidated metadata" from "not a zarr store".
+            // A v2 store root always has a .zgroup file.
+            let has_zgroup = fetch_raw_file(location, runtime, ".zgroup").is_ok();
+            if has_zgroup {
+                Err(FetchError::NoConsolidatedMetadata(format!(
+                    "Found a v2 zarr store at {} but no consolidated metadata (.zmetadata).\n\
+                     Zeph requires consolidated metadata.\n\
+                     See https://zarr.readthedocs.io/en/latest/user-guide/consolidated_metadata/",
+                    location.display_path(),
+                )))
+            } else {
+                Err(FetchError::NotFound(format!(
+                    "No zarr store found at {}",
+                    location.display_path(),
+                )))
+            }
         }
         Err(e) => Err(e),
     }
@@ -231,6 +254,14 @@ pub fn parse_store(
     runtime: &tokio::runtime::Runtime,
 ) -> anyhow::Result<StoreMeta> {
     fetch_store_meta(location, runtime).map_err(|e| anyhow::anyhow!("{e}"))
+}
+
+/// Quick check: does the raw zarr.json text declare zarr_format >= 3?
+fn is_v3_json(raw: &str) -> bool {
+    serde_json::from_str::<Value>(raw)
+        .ok()
+        .and_then(|v| v.get("zarr_format")?.as_u64())
+        .is_some_and(|f| f >= 3)
 }
 
 /// Parse a v3 root zarr.json with inline consolidated metadata into a StoreMeta.
@@ -1105,9 +1136,31 @@ mod tests {
     // --- fetch_store_meta error classification ---
 
     #[test]
-    fn fetch_missing_metadata_returns_no_consolidated_metadata() {
+    fn fetch_empty_dir_returns_not_found() {
         let dir = tempfile::tempdir().unwrap();
-        // Directory exists but has neither zarr.json nor .zmetadata
+        // Directory exists but has no zarr files at all
+        let location = StoreLocation::Local(dir.path().to_path_buf());
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let result = fetch_store_meta(&location, &runtime);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            matches!(err, FetchError::NotFound(_)),
+            "Expected NotFound, got: {err}"
+        );
+        let msg = err.to_string();
+        assert!(msg.contains("No zarr store found"), "Message: {msg}");
+    }
+
+    #[test]
+    fn fetch_v2_store_without_consolidated_metadata() {
+        let dir = tempfile::tempdir().unwrap();
+        // v2 store root has .zgroup but no .zmetadata
+        std::fs::write(
+            dir.path().join(".zgroup"),
+            r#"{"zarr_format": 2}"#,
+        )
+        .unwrap();
         let location = StoreLocation::Local(dir.path().to_path_buf());
         let runtime = tokio::runtime::Runtime::new().unwrap();
         let result = fetch_store_meta(&location, &runtime);
@@ -1118,8 +1171,7 @@ mod tests {
             "Expected NoConsolidatedMetadata, got: {err}"
         );
         let msg = err.to_string();
-        assert!(msg.contains("No consolidated metadata found"), "Message: {msg}");
-        assert!(msg.contains("zarr.readthedocs.io"), "Message: {msg}");
+        assert!(msg.contains("no consolidated metadata"), "Message: {msg}");
     }
 
     #[test]
