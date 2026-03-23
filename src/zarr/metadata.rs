@@ -340,7 +340,7 @@ fn parse_zarr_json(raw: &str) -> anyhow::Result<StoreMeta> {
         // v3 uses dimension_names directly (no _ARRAY_DIMENSIONS indirection).
         // Nulls are valid (unnamed dimensions) — map them to "" to keep
         // dims.len() == shape.len().
-        let dims: Vec<String> = node
+        let mut dims: Vec<String> = node
             .get("dimension_names")
             .and_then(|v| v.as_array())
             .map(|arr| {
@@ -379,6 +379,16 @@ fn parse_zarr_json(raw: &str) -> anyhow::Result<StoreMeta> {
             .and_then(|v| v.as_object())
             .map(|m| m.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
             .unwrap_or_default();
+
+        // Validate: if dimension_names was provided, its length must match shape.
+        if !dims.is_empty() && dims.len() != shape.len() {
+            eprintln!(
+                "warning: array {name}: dimension_names length ({}) != shape length ({}), ignoring dimension names",
+                dims.len(),
+                shape.len(),
+            );
+            dims = Vec::new();
+        }
 
         // `name` is the full consolidated-metadata key, which includes
         // the group path for nested arrays (e.g. "group1/temperature").
@@ -508,6 +518,16 @@ fn parse_zmetadata(raw: &str) -> anyhow::Result<StoreMeta> {
                     }
                 }
             }
+        }
+
+        // Validate: if _ARRAY_DIMENSIONS was provided, its length must match shape.
+        if !dims.is_empty() && dims.len() != shape.len() {
+            eprintln!(
+                "warning: array {name}: _ARRAY_DIMENSIONS length ({}) != shape length ({}), ignoring dimension names",
+                dims.len(),
+                shape.len(),
+            );
+            dims = Vec::new();
         }
 
         arrays.push(ArrayMeta {
@@ -713,6 +733,19 @@ mod tests {
             r#""data/.zarray": { "shape": [100], "dtype": "<f4" }"#,
         );
         let meta = parse_json(&json).unwrap();
+        assert!(meta.arrays[0].dims.is_empty());
+    }
+
+    #[test]
+    fn parse_v2_dims_shape_mismatch_clears_dims() {
+        let json = minimal_zmetadata(
+            r#"
+            "data/.zarray": { "shape": [100, 50], "dtype": "<f4" },
+            "data/.zattrs": { "_ARRAY_DIMENSIONS": ["time"] }
+            "#,
+        );
+        let meta = parse_json(&json).unwrap();
+        // Mismatched dims are discarded rather than kept
         assert!(meta.arrays[0].dims.is_empty());
     }
 
@@ -1040,6 +1073,23 @@ mod tests {
             }
         "#);
         let meta = parse_zarr_json(&json).unwrap();
+        assert!(meta.arrays[0].dims.is_empty());
+    }
+
+    #[test]
+    fn parse_v3_dims_shape_mismatch_clears_dims() {
+        let json = minimal_v3(r#"
+            "data": {
+                "zarr_format": 3, "node_type": "array",
+                "shape": [10, 20, 30], "data_type": "float32",
+                "chunk_grid": {"name": "regular", "configuration": {"chunk_shape": [10, 20, 30]}},
+                "codecs": [], "fill_value": 0,
+                "dimension_names": ["time", "lat"],
+                "attributes": {}
+            }
+        "#);
+        let meta = parse_zarr_json(&json).unwrap();
+        // Mismatched dims are discarded rather than kept
         assert!(meta.arrays[0].dims.is_empty());
     }
 

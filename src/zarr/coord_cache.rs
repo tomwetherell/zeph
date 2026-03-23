@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+use anyhow::Context;
 use chrono::{NaiveDate, NaiveDateTime};
 use serde_json::Value;
 use zarrs::array::{Array, ArraySubset};
@@ -110,7 +111,7 @@ async fn fetch_one(
 ) -> anyhow::Result<CoordValues> {
     let array = Array::async_open(store.clone(), path).await?;
     let shape = array.shape();
-    let len = shape[0];
+    let len = *shape.first().context("coordinate array has empty shape")?;
     let subset = ArraySubset::new_with_ranges(&[0..len]);
 
     match data_type {
