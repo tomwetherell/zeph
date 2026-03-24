@@ -2,14 +2,14 @@
 
 An interactive CLI tool to quickly and easily inspect zarr stores. Supports local and remote (S3, GCS, Azure, HTTPS) stores. 
 
-https://github.com/user-attachments/assets/3840c0ef-791d-4964-ba0f-424b110236e6
+https://github.com/user-attachments/assets/833d810b-629f-48ad-b656-d5f7ccaf2dea
 
 ## Getting Started 
 
 ### Install
 
 ```
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/tomwetherell/zeph/releases/download/v0.3.0/zeph-installer.sh | sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/tomwetherell/zeph/releases/download/v0.3.1/zeph-installer.sh | sh
 ```
 
 ### Quickstart 
@@ -22,14 +22,14 @@ See the table below for example datasets which can be used for testing.
 | --- | --- | --- | --- |
 | [WeatherBench 2 - ERA 5](https://weatherbench2.readthedocs.io/en/latest/data-guide.html) | GCS | 2 | `gs://weatherbench2/datasets/era5/1959-2022-1h-240x121_equiangular_with_poles_conservative.zarr` | 
 | [Multi-Scale Ultra High Resolution (MUR) Sea Surface Temperature (SST)](https://registry.opendata.aws/mur/) | S3 | 2 | `s3://mur-sst/zarr/` |
-| NOAA GEFS analysis | HTTPS | 3 | `https://data.dynamical.org/noaa/gefs/analysis/latest.zarr/` |
+| [NOAA GEFS from dynamical.org](https://dynamical.org/catalog/noaa-gefs-analysis/) | HTTPS | 3 | `https://data.dynamical.org/noaa/gefs/analysis/latest.zarr/` |
 
 ## Commands
 
 | Command | Description |
 | --- | --- |
 | [`/summary`](https://github.com/tomwetherell/zeph?tab=readme-ov-file#summary) | Show an overview of the store (dimensions, variables and attributes) |
-| [`/info`](https://github.com/tomwetherell/zeph?tab=readme-ov-file#info) | Show variable details (chunking information, coordinates, attributes, and more) |
+| [`/info`](https://github.com/tomwetherell/zeph?tab=readme-ov-file#info) | Show variable details (chunking, coordinates, attributes, etc.) |
 
 ### summary
 
@@ -39,7 +39,7 @@ See the table below for example datasets which can be used for testing.
 
 <img width="1134" height="641" alt="image" src="https://github.com/user-attachments/assets/901d521a-deb3-4897-9fa1-152866f5136b" />
 
-
+<img width="1090" height="739" alt="image" src="https://github.com/user-attachments/assets/227bfa91-1581-4312-af47-64ab59c52e47" />
 
 ## Limitations 
 
