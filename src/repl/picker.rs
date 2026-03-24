@@ -5,7 +5,6 @@ use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use crossterm::style::{Print, ResetColor, SetForegroundColor};
 use crossterm::terminal::{self, Clear, ClearType, ScrollUp};
 
-use crate::commands::summary::friendly_dtype;
 use crate::ui::style::Palette;
 use zeph::zarr::metadata::ArrayMeta;
 
@@ -138,19 +137,7 @@ pub fn run(arrays: &[ArrayMeta], palette: &Palette) -> anyhow::Result<Option<usi
 }
 
 fn format_item(arr: &ArrayMeta) -> String {
-    let dims = if arr.dims.is_empty() {
-        String::new()
-    } else {
-        let parts: Vec<String> = arr
-            .dims
-            .iter()
-            .zip(arr.shape.iter())
-            .map(|(d, s)| format!("{d}: {s}"))
-            .collect();
-        format!("  ({})", parts.join(", "))
-    };
-    let dtype = friendly_dtype(&arr.data_type);
-    format!("{}{dims}  {dtype}", arr.name)
+    arr.name.clone()
 }
 
 fn draw_picker(
