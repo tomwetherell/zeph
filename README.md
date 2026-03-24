@@ -6,7 +6,7 @@ https://github.com/user-attachments/assets/3840c0ef-791d-4964-ba0f-424b110236e6
 
 ## Getting Started 
 
-### Install prebuilt binaries via shell script
+### Install
 
 ```
 curl --proto '=https' --tlsv1.2 -LsSf https://github.com/tomwetherell/zeph/releases/download/v0.3.0/zeph-installer.sh | sh
@@ -14,14 +14,15 @@ curl --proto '=https' --tlsv1.2 -LsSf https://github.com/tomwetherell/zeph/relea
 
 ### Quickstart 
 
-After installation, run `zeph <path to local or remote zarr store>` to start an interactive session. 
+Run `zeph <path to local or remote zarr store>` to start an interactive session. 
 
 See the table below for example datasets which can be used for testing. 
 
-| Name  | Backend | Path | 
-| --- | --- | --- |
-| [WeatherBench 2 - ERA 5](https://weatherbench2.readthedocs.io/en/latest/data-guide.html) | GCS | `gs://weatherbench2/datasets/era5/1959-2022-1h-240x121_equiangular_with_poles_conservative.zarr` | 
-| [Multi-Scale Ultra High Resolution (MUR) Sea Surface Temperature (SST)](https://registry.opendata.aws/mur/) | S3 | `s3://mur-sst/zarr/` |
+| Name  | Backend | Zarr Version | Path | 
+| --- | --- | --- | --- |
+| [WeatherBench 2 - ERA 5](https://weatherbench2.readthedocs.io/en/latest/data-guide.html) | GCS | 2 | `gs://weatherbench2/datasets/era5/1959-2022-1h-240x121_equiangular_with_poles_conservative.zarr` | 
+| [Multi-Scale Ultra High Resolution (MUR) Sea Surface Temperature (SST)](https://registry.opendata.aws/mur/) | S3 | 2 | `s3://mur-sst/zarr/` |
+| NOAA GEFS analysis | HTTPS | 3 | `https://data.dynamical.org/noaa/gefs/analysis/latest.zarr/` |
 
 ## Commands
 
@@ -32,11 +33,13 @@ See the table below for example datasets which can be used for testing.
 
 ### summary
 
-<img width="1177" height="626" alt="image" src="https://github.com/user-attachments/assets/a5213049-fb00-4cbd-a87e-c0917db8995c" />
+<img width="1134" height="641" alt="image" src="https://github.com/user-attachments/assets/a0b7f767-940e-4715-a2c3-f49b33f06143" />
 
 ### info 
 
-<img width="1177" height="610" alt="image" src="https://github.com/user-attachments/assets/fde349b3-f594-411a-a602-8088c1de3438" />
+<img width="1134" height="641" alt="image" src="https://github.com/user-attachments/assets/901d521a-deb3-4897-9fa1-152866f5136b" />
+
+
 
 ## Limitations 
 
