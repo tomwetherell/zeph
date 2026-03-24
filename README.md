@@ -1,6 +1,6 @@
 # zeph
 
-An interactive CLI tool to quickly and easily inspect zarr stores. Supports local and remote (S3, GCS, Azure, HTTPS) stores. 
+An interactive CLI tool to quickly and easily inspect zarr stores. Supports Zarr v2 and v3, with local and remote (S3, GCS, Azure, HTTPS) backends.
 
 https://github.com/user-attachments/assets/833d810b-629f-48ad-b656-d5f7ccaf2dea
 
@@ -15,8 +15,6 @@ curl --proto '=https' --tlsv1.2 -LsSf https://github.com/tomwetherell/zeph/relea
 ### Quickstart 
 
 Run `zeph <path to local or remote zarr store>` to start an interactive session. 
-
-See the table below for example datasets which can be used for testing. 
 
 | Name  | Backend | Zarr Version | Path | 
 | --- | --- | --- | --- |
@@ -41,6 +39,7 @@ See the table below for example datasets which can be used for testing.
 
 <img width="1090" height="739" alt="image" src="https://github.com/user-attachments/assets/227bfa91-1581-4312-af47-64ab59c52e47" />
 
-## Limitations 
+## Notes 
 
-* zarr stores without [consolidated metadata](https://zarr.readthedocs.io/en/latest/user-guide/consolidated_metadata/) are not supported. 
+* Supports both v2 and v3
+* Stores must include [consolidated metadata](https://zarr.readthedocs.io/en/latest/user-guide/consolidated_metadata/)
